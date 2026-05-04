@@ -199,8 +199,24 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
   const yearKeys = Object.keys(tree).map(Number).sort((a, b) => b - a);
   const weekKeys = Object.keys(weekMap).sort((a, b) => parseWeekKey(b) - parseWeekKey(a));
 
-  const grandTotal = sum(won);
-  const grandLost  = sum(lost);
+  // Best month and best quarter across all history
+  let biggestMonth: { label: string; total: number } | null = null;
+  let biggestQuarter: { label: string; total: number } | null = null;
+  for (const y of yearKeys) {
+    for (const q of Object.keys(tree[y]).map(Number)) {
+      const qDeals = Object.values(tree[y][q]).flat();
+      const qTotal = sum(qDeals);
+      if (!biggestQuarter || qTotal > biggestQuarter.total) {
+        biggestQuarter = { label: `Q${q} ${y}`, total: qTotal };
+      }
+      for (const m of Object.keys(tree[y][q]).map(Number)) {
+        const mTotal = sum(tree[y][q][m]);
+        if (!biggestMonth || mTotal > biggestMonth.total) {
+          biggestMonth = { label: `${MONTH_NAMES[m - 1]} ${y}`, total: mTotal };
+        }
+      }
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -208,26 +224,22 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
       {/* ── Summary cards + view toggle ── */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex gap-4 flex-1">
-          <div className="bg-white rounded-xl border border-gray-200 px-5 py-3.5 flex items-center gap-5">
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Closed Won</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-0.5">{fmtFull(grandTotal)}</p>
+          {[
+            { label: 'Best Month',   stat: biggestMonth },
+            { label: 'Best Quarter', stat: biggestQuarter },
+          ].map(({ label, stat }) => (
+            <div key={label} className="bg-white rounded-xl border border-gray-200 px-5 py-3.5 flex-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+              {stat ? (
+                <>
+                  <p className="text-base font-bold text-slate-800 mt-0.5">{stat.label}</p>
+                  <p className="text-xl font-bold text-emerald-600">{fmtFull(stat.total)}</p>
+                </>
+              ) : (
+                <p className="text-lg font-bold text-gray-300 mt-0.5">—</p>
+              )}
             </div>
-            <div className="w-px h-9 bg-gray-100" />
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Deals</p>
-              <p className="text-2xl font-bold text-slate-800 mt-0.5">{won.length}</p>
-            </div>
-            {grandLost > 0 && (
-              <>
-                <div className="w-px h-9 bg-gray-100" />
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Closed Lost</p>
-                  <p className="text-2xl font-bold text-red-500 mt-0.5">{fmtFull(grandLost)}</p>
-                </div>
-              </>
-            )}
-          </div>
+          ))}
         </div>
 
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 shrink-0">
