@@ -10,6 +10,10 @@ const FORECAST_BADGE: Record<ForecastCategory, string> = {
   'Omitted':   'bg-red-100 text-red-700',
 };
 
+const FC_ORDER: Record<string, number> = {
+  'Commit': 4, 'Best Case': 3, 'Pipeline': 2, 'Omitted': 1,
+};
+
 function fmt(v: number) {
   return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 }
@@ -24,27 +28,38 @@ function pct(p: number) {
   return Math.round(p * 100) + '%';
 }
 
+type SortKey = 'amount' | 'date-asc' | 'date-desc' | 'forecast';
+
+function sortDeals(deals: Deal[], key: SortKey): Deal[] {
+  const copy = [...deals];
+  switch (key) {
+    case 'amount':    return copy.sort((a, b) => b.value - a.value);
+    case 'date-asc':  return copy.sort((a, b) => (a.closeDate ?? '').localeCompare(b.closeDate ?? ''));
+    case 'date-desc': return copy.sort((a, b) => (b.closeDate ?? '').localeCompare(a.closeDate ?? ''));
+    case 'forecast':  return copy.sort((a, b) => (FC_ORDER[b.forecastCategory] ?? 0) - (FC_ORDER[a.forecastCategory] ?? 0));
+  }
+}
+
 interface ResultsViewProps {
   deals: Deal[];
   accentColor: string;
 }
 
 interface SectionProps {
-  title:      string;
-  deals:      Deal[];
-  totalARR:   number;
-  headerBg:   string;
-  headerText: string;
+  title:       string;
+  deals:       Deal[];
+  headerBg:    string;
+  headerText:  string;
   defaultOpen: boolean;
+  sortKey:     SortKey;
 }
 
-function Section({ title, deals, totalARR, headerBg, headerText, defaultOpen }: SectionProps) {
+function Section({ title, deals, headerBg, headerText, defaultOpen, sortKey }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const sorted = [...deals].sort((a, b) => b.value - a.value);
+  const sorted = sortDeals(deals, sortKey);
 
   return (
     <>
-      {/* Section header row */}
       <tr
         onClick={() => setOpen(o => !o)}
         className={`cursor-pointer select-none ${headerBg}`}
@@ -61,39 +76,43 @@ function Section({ title, deals, totalARR, headerBg, headerText, defaultOpen }: 
       </tr>
 
       {open && (
-        <>
-          {sorted.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="px-5 py-3 text-sm text-gray-400 italic">No deals in this group.</td>
+        sorted.length === 0 ? (
+          <tr>
+            <td colSpan={6} className="px-5 py-3 text-sm text-gray-400 italic">No deals in this group.</td>
+          </tr>
+        ) : (
+          sorted.map((deal, i) => (
+            <tr key={deal.id} className={`hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+              <td className="px-5 py-2.5 font-medium text-slate-800">{deal.company}</td>
+              <td className="px-5 py-2.5 text-gray-600">{deal.owner}</td>
+              <td className="px-5 py-2.5">
+                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${FORECAST_BADGE[deal.forecastCategory]}`}>
+                  {deal.forecastCategory}
+                </span>
+              </td>
+              <td className="px-5 py-2.5 text-right text-gray-500">{pct(deal.probability)}</td>
+              <td className="px-5 py-2.5 text-right font-semibold text-slate-800">{fmt(deal.value)}</td>
+              <td className="px-5 py-2.5 text-gray-500">{fmtDate(deal.closeDate)}</td>
             </tr>
-          ) : (
-            <>
-              {sorted.map((deal, i) => (
-                <tr key={deal.id} className={`hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                  <td className="px-5 py-2.5 font-medium text-slate-800">{deal.company}</td>
-                  <td className="px-5 py-2.5 text-gray-600">{deal.owner}</td>
-                  <td className="px-5 py-2.5">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${FORECAST_BADGE[deal.forecastCategory]}`}>
-                      {deal.forecastCategory}
-                    </span>
-                  </td>
-                  <td className="px-5 py-2.5 text-right text-gray-500">{pct(deal.probability)}</td>
-                  <td className="px-5 py-2.5 text-right font-semibold text-slate-800">{fmt(deal.value)}</td>
-                  <td className="px-5 py-2.5 text-gray-500">{fmtDate(deal.closeDate)}</td>
-                </tr>
-              ))}
-            </>
-          )}
-        </>
+          ))
+        )
       )}
 
-      {/* Divider between sections */}
       <tr><td colSpan={6} className="h-2 bg-gray-100" /></tr>
     </>
   );
 }
 
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'amount',    label: 'Amount'             },
+  { key: 'date-asc',  label: 'Close Date (soon)'  },
+  { key: 'date-desc', label: 'Close Date (latest)'},
+  { key: 'forecast',  label: 'Forecast'           },
+];
+
 export default function ResultsView({ deals }: ResultsViewProps) {
+  const [sortKey, setSortKey] = useState<SortKey>('amount');
+
   const won        = deals.filter(d => d.probability >= 0.99);
   const inProgress = deals.filter(d => d.probability > 0.01 && d.probability < 0.99);
   const lost       = deals.filter(d => d.probability <= 0.01);
@@ -120,6 +139,26 @@ export default function ResultsView({ deals }: ResultsViewProps) {
         ))}
       </div>
 
+      {/* Sort control */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">Order by</span>
+        <div className="flex gap-1 flex-wrap">
+          {SORT_OPTIONS.map(o => (
+            <button
+              key={o.key}
+              onClick={() => setSortKey(o.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                sortKey === o.key
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -134,30 +173,9 @@ export default function ResultsView({ deals }: ResultsViewProps) {
               </tr>
             </thead>
             <tbody>
-              <Section
-                title="Closed Won"
-                deals={won}
-                totalARR={wonARR}
-                headerBg="bg-emerald-50 hover:bg-emerald-100"
-                headerText="text-emerald-800"
-                defaultOpen={true}
-              />
-              <Section
-                title="In Progress"
-                deals={inProgress}
-                totalARR={inpARR}
-                headerBg="bg-blue-50 hover:bg-blue-100"
-                headerText="text-blue-800"
-                defaultOpen={false}
-              />
-              <Section
-                title="Closed Lost"
-                deals={lost}
-                totalARR={lostARR}
-                headerBg="bg-red-50 hover:bg-red-100"
-                headerText="text-red-700"
-                defaultOpen={false}
-              />
+              <Section title="Closed Won"   deals={won}        headerBg="bg-emerald-50 hover:bg-emerald-100" headerText="text-emerald-800" defaultOpen={true}  sortKey={sortKey} />
+              <Section title="In Progress"  deals={inProgress} headerBg="bg-blue-50 hover:bg-blue-100"       headerText="text-blue-800"    defaultOpen={false} sortKey={sortKey} />
+              <Section title="Closed Lost"  deals={lost}       headerBg="bg-red-50 hover:bg-red-100"         headerText="text-red-700"     defaultOpen={false} sortKey={sortKey} />
             </tbody>
           </table>
         </div>
