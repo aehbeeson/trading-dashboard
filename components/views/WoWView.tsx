@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Deal } from '@/lib/types';
 
 const FC_ORDER: Record<string, number> = {
@@ -33,7 +34,16 @@ interface WoWViewProps {
   accentColor: string;
 }
 
+function hasChanged(deal: Deal, prev: Deal | undefined): boolean {
+  if (!prev) return true;
+  return prev.closeDate !== deal.closeDate
+    || prev.forecastCategory !== deal.forecastCategory
+    || prev.value !== deal.value;
+}
+
 export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProps) {
+  const [showAll, setShowAll] = useState(false);
+
   const lwMap  = new Map(allLastWeek.map(d => [d.id, d]));
   const twIds  = new Set(thisWeek.map(d => d.id));
 
@@ -47,7 +57,9 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
     .reduce((s, d) => s + (d.value - lwMap.get(d.id)!.value), 0);
   const net = newARR - removedARR + changedDelta;
 
-  const sorted = [...thisWeek].sort((a, b) => a.closeDate.localeCompare(b.closeDate));
+  const sorted   = [...thisWeek].sort((a, b) => a.closeDate.localeCompare(b.closeDate));
+  const changed  = sorted.filter(d => hasChanged(d, lwMap.get(d.id)));
+  const visible  = showAll ? sorted : changed;
 
   return (
     <div>
@@ -67,6 +79,20 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
       </div>
 
       {/* Detail table */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-gray-500">
+          {showAll
+            ? `Showing all ${sorted.length} deals`
+            : `Showing ${changed.length} deal${changed.length !== 1 ? 's' : ''} with changes`}
+        </p>
+        <button
+          onClick={() => setShowAll(v => !v)}
+          className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+        >
+          {showAll ? `Changes only (${changed.length})` : `Show all (${sorted.length})`}
+        </button>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -83,7 +109,7 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map((deal, i) => {
+              {visible.map((deal, i) => {
                 const prev   = lwMap.get(deal.id);
                 const isNew  = !prev;
                 const rowBg  = i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
