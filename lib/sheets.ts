@@ -1,13 +1,15 @@
-import { Deal, SDForecastEntry } from './types';
+import { Deal, SDForecastEntry, PipelineGenDeal } from './types';
 import { thisWeekDeals, lastWeekDeals } from './mockData';
 
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwchrLZsUlIAHCVm7bV3orxCXHzxnodFeoDl3svh4jQNUFje6bz2KwtuySdV0mgVKl0Lg/exec';
 
 export interface SheetData {
-  thisWeek:    Deal[];
-  lastWeek:    Deal[];
-  sdForecasts: SDForecastEntry[];
-  fetchedAt:   string;
+  thisWeek:            Deal[];
+  lastWeek:            Deal[];
+  sdForecasts:         SDForecastEntry[];
+  pipelineGen:         PipelineGenDeal[];
+  pipelineGenLastWeek: PipelineGenDeal[];
+  fetchedAt:           string;
 }
 
 export async function fetchDashboardData(): Promise<SheetData> {
@@ -26,13 +28,15 @@ export async function fetchDashboardData(): Promise<SheetData> {
 
     const data = JSON.parse(text);
     return {
-      thisWeek:    data.thisWeek    ?? [],
-      lastWeek:    data.lastWeek    ?? [],
-      sdForecasts: data.sdForecasts ?? [],
-      fetchedAt:   data.fetchedAt   ?? new Date().toISOString(),
+      thisWeek:            data.thisWeek            ?? [],
+      lastWeek:            data.lastWeek            ?? [],
+      sdForecasts:         data.sdForecasts         ?? [],
+      pipelineGen:         data.pipelineGen         ?? [],
+      pipelineGenLastWeek: data.pipelineGenLastWeek ?? [],
+      fetchedAt:           data.fetchedAt           ?? new Date().toISOString(),
     };
   } catch (err) {
     console.error('fetchDashboardData failed, using mock data:', err);
-    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], fetchedAt: new Date().toISOString() };
+    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], fetchedAt: new Date().toISOString() };
   }
 }

@@ -19,10 +19,12 @@ function doGet(e) {
 function getDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var result = {
-    thisWeek:    readTab(ss, 'Clean Data'),
-    lastWeek:    readTab(ss, 'Clean Data Last Week'),
-    sdForecasts: readSDForecast(ss),
-    fetchedAt:   new Date().toISOString()
+    thisWeek:            readTab(ss, 'Clean Data'),
+    lastWeek:            readTab(ss, 'Clean Data Last Week'),
+    sdForecasts:         readSDForecast(ss),
+    pipelineGen:         readPipelineGen(ss, 'Clean Data'),
+    pipelineGenLastWeek: readPipelineGen(ss, 'Clean Data Last Week'),
+    fetchedAt:           new Date().toISOString()
   };
   Logger.log('thisWeek count: ' + result.thisWeek.length);
   Logger.log('lastWeek count: ' + result.lastWeek.length);
@@ -116,6 +118,68 @@ function readSDForecast(ss) {
     });
   }
   return result;
+}
+
+// ── Pipeline Generation ──────────────────────────────────────────────────────
+// Uses Amount in company currency (not splits), grouped by Source Type.
+// Scoped to New Customer Pipeline only.
+
+function readPipelineGen(ss, tabName) {
+  var sheet = ss.getSheetByName(tabName);
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length < 3) return [];
+
+  var H = {};
+  rows[1].forEach(function(h, i) { H[String(h).trim()] = i; });
+
+  var C = {
+    DEAL_ID:       findCol(H, ['Deal ID', 'Record ID'],                               0),
+    COMPANY_NAME:  findCol(H, ['Company name', 'Company Name'],                       2),
+    CLEAN_COMPANY: findCol(H, ['Clean Company Name', 'Clean Company'],               23),
+    DEAL_OWNER:    findCol(H, ['Deal owner', 'Deal Owner'],                          12),
+    AMOUNT:        findCol(H, ['Amount in company currency', 'Amount'],               6),
+    PIPELINE:      findCol(H, ['Pipeline'],                                          13),
+    CREATE_DATE_C: findCol(H, ['Create Date (excl time)'],                           24),
+    CREATE_DATE:   findCol(H, ['Create Date'],                                       14),
+    SOURCE_TYPE:   findCol(H, ['Source Type'],                                       36),
+  };
+
+  var tz   = Session.getScriptTimeZone();
+  var out  = [];
+
+  for (var i = 2; i < rows.length; i++) {
+    var row = rows[i];
+
+    if (String(row[C.PIPELINE] || '').trim() !== 'New Customer Pipeline') continue;
+
+    var dealId = String(row[C.DEAL_ID] || '').trim();
+    if (!dealId) continue;
+
+    var amount = parseFloat(String(row[C.AMOUNT] || '0').replace(/[£$€,\s]/g, '')) || 0;
+    if (amount <= 0) continue;
+
+    var sourceType = String(row[C.SOURCE_TYPE] || '').trim();
+    if (!sourceType || sourceType === '#N/A') continue;
+
+    var cleanCompany = String(row[C.CLEAN_COMPANY] || '').trim();
+    var company      = cleanCompany || String(row[C.COMPANY_NAME] || '').trim();
+    var owner        = String(row[C.DEAL_OWNER] || '').trim();
+
+    var rawDate = row[C.CREATE_DATE_C] || row[C.CREATE_DATE];
+    var createDate = '';
+    if (rawDate instanceof Date && !isNaN(rawDate)) {
+      createDate = Utilities.formatDate(rawDate, tz, 'yyyy-MM-dd');
+    } else if (rawDate) {
+      var parsed = new Date(rawDate);
+      createDate = isNaN(parsed) ? String(rawDate).trim() : Utilities.formatDate(parsed, tz, 'yyyy-MM-dd');
+    }
+    if (!createDate) continue;
+
+    out.push({ id: dealId, company: company, owner: owner, amount: amount, sourceType: sourceType, createDate: createDate });
+  }
+
+  return out;
 }
 
 // ── Column helpers ───────────────────────────────────────────────────────────

@@ -16,7 +16,16 @@ export interface SDForecastEntry {
   otherDeals: string;
   updatedAt:  string;
 }
-export type SubTabKey = 'results' | 'forecast' | 'wow' | 'prior';
+export type SubTabKey = 'results' | 'forecast' | 'wow' | 'prior' | 'pipeline-gen';
+
+export interface PipelineGenDeal {
+  id:         string;
+  company:    string;
+  owner:      string;
+  amount:     number;     // Amount in company currency
+  sourceType: string;     // raw Source Type value
+  createDate: string;     // YYYY-MM-DD
+}
 export type ForecastCategory = 'Commit' | 'Best Case' | 'Pipeline' | 'Omitted';
 
 export interface Deal {
