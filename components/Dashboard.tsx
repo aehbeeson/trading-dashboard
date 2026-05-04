@@ -188,7 +188,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, fetchedAt }
 
       <main className="max-w-screen-xl mx-auto px-6 py-6">
         {activeArea === 'summary' ? (
-          <SummaryPage thisWeek={filteredThisWeek} lastWeek={filteredLastWeek} onAreaClick={handleAreaClick} />
+          <SummaryPage thisWeek={filteredThisWeek} lastWeek={filteredLastWeek} allThisWeek={thisWeek} onAreaClick={handleAreaClick} />
         ) : (
           <AreaPage
             area={activeArea}
