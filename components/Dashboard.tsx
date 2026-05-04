@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, SDForecastEntry, PipelineGenDeal } from '@/lib/types';
+import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry } from '@/lib/types';
 import SummaryPage from './SummaryPage';
 import AreaPage from './AreaPage';
 
@@ -9,9 +9,10 @@ interface DashboardProps {
   thisWeek:            Deal[];
   lastWeek:            Deal[];
   sdForecasts:         SDForecastEntry[];
-  pipelineGen:         PipelineGenDeal[];
-  pipelineGenLastWeek: PipelineGenDeal[];
-  dataDownloadedAt:    string;
+  pipelineGen:          PipelineGenDeal[];
+  pipelineGenLastWeek:  PipelineGenDeal[];
+  pipelineGenForecasts: PipelineGenForecastEntry[];
+  dataDownloadedAt:     string;
   fetchedAt:           string;
 }
 
@@ -55,7 +56,7 @@ function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
 
 const [defaultFrom, defaultTo] = monthRange();
 
-export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, dataDownloadedAt, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, dataDownloadedAt, fetchedAt }: DashboardProps) {
   const [activeArea,   setActiveArea]   = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('results');
   const [filterFrom,   setFilterFrom]   = useState(defaultFrom);
@@ -216,6 +217,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
             sdForecast={sdForecasts.find(f => f.area === activeArea) ?? null}
             pipelineGen={pipelineGen}
             pipelineGenLastWeek={pipelineGenLastWeek}
+            pipelineGenForecasts={pipelineGenForecasts}
           />
         )}
       </main>

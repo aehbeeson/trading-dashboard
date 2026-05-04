@@ -1,6 +1,6 @@
 'use client';
 
-import { Deal, AreaKey, SubTabKey, AREAS, SDForecastEntry, PipelineGenDeal } from '@/lib/types';
+import { Deal, AreaKey, SubTabKey, AREAS, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry } from '@/lib/types';
 import ResultsView from './views/ResultsView';
 import ForecastView from './views/ForecastView';
 import WoWView from './views/WoWView';
@@ -15,11 +15,12 @@ interface AreaPageProps {
   allLastWeek: Deal[];
   allThisWeek: Deal[];
   sdForecast: SDForecastEntry | null;
-  pipelineGen: PipelineGenDeal[];
-  pipelineGenLastWeek: PipelineGenDeal[];
+  pipelineGen:          PipelineGenDeal[];
+  pipelineGenLastWeek:  PipelineGenDeal[];
+  pipelineGenForecasts: PipelineGenForecastEntry[];
 }
 
-export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek, allThisWeek, sdForecast, pipelineGen, pipelineGenLastWeek }: AreaPageProps) {
+export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek, allThisWeek, sdForecast, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts }: AreaPageProps) {
   const config = AREAS.find(a => a.key === area)!;
 
   return (
@@ -34,7 +35,7 @@ export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek
       {subTab === 'wow'      && <WoWView          thisWeek={thisWeek} lastWeek={lastWeek} allLastWeek={allLastWeek} accentColor={config.accentColor} />}
       {subTab === 'prior'        && <PriorPeriodView  deals={allThisWeek} accentColor={config.accentColor} />}
       {subTab === 'pipeline-gen' && area === 'new-business' && (
-        <PipelineGenView pipelineGen={pipelineGen} pipelineGenLastWeek={pipelineGenLastWeek} />
+        <PipelineGenView pipelineGen={pipelineGen} pipelineGenLastWeek={pipelineGenLastWeek} pipelineGenForecasts={pipelineGenForecasts} />
       )}
     </div>
   );

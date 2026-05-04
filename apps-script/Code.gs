@@ -3,6 +3,9 @@ function doGet(e) {
     if (e.parameter.action === 'saveForecast') {
       return handleSaveForecast(e.parameter.data);
     }
+    if (e.parameter.action === 'savePipelineGenForecast') {
+      return handleSavePipelineGenForecast(e.parameter.data);
+    }
     if (e.parameter.format === 'json') {
       var data = getDashboardData();
       return ContentService
@@ -32,12 +35,80 @@ function getDashboardData() {
     sdForecasts:         readSDForecast(ss),
     pipelineGen:         readPipelineGen(ss, 'Clean Data'),
     pipelineGenLastWeek: readPipelineGen(ss, 'Clean Data Last Week'),
-    dataDownloadedAt:    dataDownloadedAt,
-    fetchedAt:           new Date().toISOString()
+    dataDownloadedAt:      dataDownloadedAt,
+    pipelineGenForecasts:  readPipelineGenForecast(ss),
+    fetchedAt:             new Date().toISOString()
   };
   Logger.log('thisWeek count: ' + result.thisWeek.length);
   Logger.log('lastWeek count: ' + result.lastWeek.length);
   if (result.thisWeek.length > 0) Logger.log('First deal: ' + JSON.stringify(result.thisWeek[0]));
+  return result;
+}
+
+// ── Pipeline Gen Forecast sheet ──────────────────────────────────────────────
+// Append-log keyed by period string (e.g. "2026-05" for month, "2026-Q2" for quarter).
+// Latest row per period wins on read.
+
+function getOrCreatePipelineGenForecastSheet(ss) {
+  var sheet = ss.getSheetByName('Pipeline Gen Forecast');
+  if (!sheet) {
+    sheet = ss.insertSheet('Pipeline Gen Forecast');
+    sheet.getRange(1, 1, 1, 6).setValues([[
+      'SubmittedAt', 'Period', 'Events', 'InboundPaid', 'InboundOther', 'Outbound'
+    ]]);
+  }
+  return sheet;
+}
+
+function handleSavePipelineGenForecast(encodedData) {
+  try {
+    var data  = JSON.parse(decodeURIComponent(encodedData));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = getOrCreatePipelineGenForecastSheet(ss);
+    sheet.appendRow([
+      new Date().toISOString(),
+      String(data.period      || '').trim(),
+      Number(data.events)      || 0,
+      Number(data.inboundPaid) || 0,
+      Number(data.inboundOther)|| 0,
+      Number(data.outbound)    || 0,
+    ]);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function readPipelineGenForecast(ss) {
+  var sheet = ss.getSheetByName('Pipeline Gen Forecast');
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return [];
+
+  var latest = {};
+  for (var i = 1; i < rows.length; i++) {
+    var r      = rows[i];
+    var period = String(r[1] || '').trim();
+    if (!period) continue;
+    latest[period] = r;
+  }
+
+  var result = [];
+  for (var key in latest) {
+    var r = latest[key];
+    result.push({
+      period:       key,
+      events:       Number(r[2]) || 0,
+      inboundPaid:  Number(r[3]) || 0,
+      inboundOther: Number(r[4]) || 0,
+      outbound:     Number(r[5]) || 0,
+      updatedAt:    String(r[0] || ''),
+    });
+  }
   return result;
 }
 

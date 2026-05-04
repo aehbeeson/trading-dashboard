@@ -18,6 +18,15 @@ export interface SDForecastEntry {
 }
 export type SubTabKey = 'results' | 'forecast' | 'wow' | 'prior' | 'pipeline-gen';
 
+export interface PipelineGenForecastEntry {
+  period:       string;  // "2026-05" (month) or "2026-Q2" (quarter)
+  events:       number;
+  inboundPaid:  number;
+  inboundOther: number;
+  outbound:     number;
+  updatedAt:    string;
+}
+
 export interface PipelineGenDeal {
   id:         string;
   company:    string;

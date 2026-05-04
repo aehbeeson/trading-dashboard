@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PipelineGenDeal } from '@/lib/types';
+import { PipelineGenDeal, PipelineGenForecastEntry } from '@/lib/types';
 
 // ─── Source type mapping ──────────────────────────────────────────────────────
 
@@ -64,10 +64,10 @@ function pctThroughMonth(prefix: string): number {
 interface QtrInfo { year: number; q: number; isCurrent: boolean }
 
 function latestQtrInfo(deals: PipelineGenDeal[]): QtrInfo {
-  const now      = new Date();
-  const curYear  = now.getFullYear();
-  const curQ     = Math.ceil((now.getMonth() + 1) / 3);
-  const hasNow   = deals.some(d => {
+  const now     = new Date();
+  const curYear = now.getFullYear();
+  const curQ    = Math.ceil((now.getMonth() + 1) / 3);
+  const hasNow  = deals.some(d => {
     if (!d.createDate) return false;
     const y = parseInt(d.createDate.substring(0, 4));
     const m = parseInt(d.createDate.substring(5, 7));
@@ -99,13 +99,97 @@ function filterQTD(deals: PipelineGenDeal[], info: QtrInfo): PipelineGenDeal[] {
 function pctThroughQtr(info: QtrInfo): number {
   if (!info.isCurrent) return 100;
   const now    = new Date();
-  const startM = (info.q - 1) * 3;      // 0-based
-  const endM   = info.q * 3 - 1;        // 0-based, last month of quarter
+  const startM = (info.q - 1) * 3;
+  const endM   = info.q * 3 - 1;
   const qStart = new Date(info.year, startM, 1);
   const qEnd   = new Date(info.year, endM + 1, 0);
   const total  = Math.round((qEnd.getTime() - qStart.getTime()) / 86_400_000) + 1;
   const elapsed = Math.round((now.getTime() - qStart.getTime()) / 86_400_000) + 1;
   return Math.min(100, Math.round((elapsed / total) * 100));
+}
+
+// ─── Forecast state ───────────────────────────────────────────────────────────
+
+type ForecastMap = Record<Category, number>;
+const EMPTY_FORECAST: ForecastMap = { Events: 0, 'Inbound Paid': 0, 'Inbound Other': 0, Outbound: 0 };
+
+function entryToMap(entry: PipelineGenForecastEntry): ForecastMap {
+  return {
+    Events:          entry.events,
+    'Inbound Paid':  entry.inboundPaid,
+    'Inbound Other': entry.inboundOther,
+    Outbound:        entry.outbound,
+  };
+}
+
+function mapEqual(a: ForecastMap, b: ForecastMap): boolean {
+  return CATEGORIES.every(c => a[c] === b[c]);
+}
+
+function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEntry | null) {
+  const [draft,   setDraft]   = useState<ForecastMap>(EMPTY_FORECAST);
+  const [saved,   setSaved]   = useState<ForecastMap>(EMPTY_FORECAST);
+  const [saving,  setSaving]  = useState(false);
+  const [saveOk,  setSaveOk]  = useState(false);
+  const [loaded,  setLoaded]  = useState(false);
+
+  useEffect(() => {
+    const fromServer = serverEntry ? entryToMap(serverEntry) : null;
+    let initial: ForecastMap = EMPTY_FORECAST;
+    if (fromServer) {
+      initial = fromServer;
+    } else {
+      try {
+        const raw = localStorage.getItem(localKey);
+        if (raw) initial = JSON.parse(raw);
+      } catch {}
+    }
+    setDraft(initial);
+    setSaved(initial);
+    setLoaded(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isDirty = loaded && !mapEqual(draft, saved);
+
+  function update(cat: Category, value: number) {
+    const next = { ...draft, [cat]: value };
+    setDraft(next);
+    setSaveOk(false);
+    try { localStorage.setItem(localKey, JSON.stringify(next)); } catch {}
+  }
+
+  async function submit(period: string) {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/pipeline-gen-forecast', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period,
+          events:       draft.Events,
+          inboundPaid:  draft['Inbound Paid'],
+          inboundOther: draft['Inbound Other'],
+          outbound:     draft.Outbound,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSaved(draft);
+        setSaveOk(true);
+        setTimeout(() => setSaveOk(false), 3000);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function discard() {
+    setDraft(saved);
+    try { localStorage.setItem(localKey, JSON.stringify(saved)); } catch {}
+  }
+
+  return { draft, update, isDirty, saving, saveOk, submit, discard, loaded };
 }
 
 // ─── £k input ────────────────────────────────────────────────────────────────
@@ -144,22 +228,30 @@ function reachColour(actual: number, target: number): string {
 
 // ─── Shared table ─────────────────────────────────────────────────────────────
 
-type ForecastMap = Record<Category, number>;
-const EMPTY_FORECAST: ForecastMap = { Events: 0, 'Inbound Paid': 0, 'Inbound Other': 0, Outbound: 0 };
-
 interface PipelineTableProps {
-  resultLabel:   string;   // e.g. 'MTD' | 'QTD'
-  forecastLabel: string;   // e.g. 'Month' | 'Quarter'
+  resultLabel:   string;
+  forecastLabel: string;
   results:       Record<Category, number>;
   lwResults:     Record<Category, number>;
   forecast:      ForecastMap;
   onForecast:    (cat: Category, v: number) => void;
+  isDirty:       boolean;
+  saving:        boolean;
+  saveOk:        boolean;
+  onSubmit:      () => void;
+  onDiscard:     () => void;
+  updatedAt?:    string;
 }
 
-function PipelineTable({ resultLabel, forecastLabel, results, lwResults, forecast, onForecast }: PipelineTableProps) {
+function PipelineTable({
+  resultLabel, forecastLabel,
+  results, lwResults, forecast, onForecast,
+  isDirty, saving, saveOk, onSubmit, onDiscard, updatedAt,
+}: PipelineTableProps) {
   const total    = CATEGORIES.reduce((s, c) => s + results[c], 0);
   const lwTotal  = CATEGORIES.reduce((s, c) => s + lwResults[c], 0);
   const frcTotal = CATEGORIES.reduce((s, c) => s + forecast[c], 0);
+  const colSpan  = CATEGORIES.length + 2;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -175,7 +267,7 @@ function PipelineTable({ resultLabel, forecastLabel, results, lwResults, forecas
             </tr>
           </thead>
           <tbody>
-            {/* Results row */}
+            {/* Results */}
             <tr className="bg-blue-50 border-t border-gray-100">
               <td className="px-5 py-3.5 font-semibold text-slate-700">
                 <span className="underline decoration-blue-400">{resultLabel}</span> Results
@@ -188,7 +280,7 @@ function PipelineTable({ resultLabel, forecastLabel, results, lwResults, forecas
               <td className="px-4 py-3.5 text-right font-bold text-blue-800 tabular-nums">{fmtK(total)}</td>
             </tr>
 
-            {/* Forecast row */}
+            {/* Forecast */}
             <tr className="bg-white border-t border-gray-100">
               <td className="px-5 py-3 font-semibold text-slate-700">
                 Full <span className="underline decoration-gray-400">{forecastLabel}</span> Forecast
@@ -226,6 +318,43 @@ function PipelineTable({ resultLabel, forecastLabel, results, lwResults, forecas
                 {fmtPct(lwTotal, frcTotal)}
               </td>
             </tr>
+
+            {/* Submit row */}
+            <tr className="border-t border-gray-200 bg-gray-50">
+              <td colSpan={colSpan} className="px-5 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">
+                    {updatedAt
+                      ? `Last saved to Sheets: ${new Date(updatedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : 'Not yet saved to Sheets'}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {saveOk && (
+                      <span className="text-emerald-600 text-sm font-medium">Saved to Sheets ✓</span>
+                    )}
+                    {isDirty && !saving && (
+                      <button
+                        onClick={onDiscard}
+                        className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        Discard
+                      </button>
+                    )}
+                    <button
+                      onClick={onSubmit}
+                      disabled={!isDirty || saving}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        isDirty && !saving
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {saving ? 'Saving…' : 'Save to Sheets'}
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -249,54 +378,40 @@ function ThroughBadge({ pct, unit }: { pct: number; unit: string }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface PipelineGenViewProps {
-  pipelineGen:         PipelineGenDeal[];
-  pipelineGenLastWeek: PipelineGenDeal[];
+  pipelineGen:          PipelineGenDeal[];
+  pipelineGenLastWeek:  PipelineGenDeal[];
+  pipelineGenForecasts: PipelineGenForecastEntry[];
 }
 
-export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: PipelineGenViewProps) {
-  const [mthForecast, setMthForecast] = useState<ForecastMap>(EMPTY_FORECAST);
-  const [qtrForecast, setQtrForecast] = useState<ForecastMap>(EMPTY_FORECAST);
-  const [loaded,      setLoaded]      = useState(false);
+export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipelineGenForecasts }: PipelineGenViewProps) {
+  // Active periods (derived synchronously from props)
+  const mthPrefix  = latestMonthPrefix(pipelineGen);
+  const qtrInfo    = latestQtrInfo(pipelineGen);
+  const qtrKey     = `${qtrInfo.year}-Q${qtrInfo.q}`;
 
-  useEffect(() => {
-    try {
-      const m = localStorage.getItem('pipelineGenForecast');
-      if (m) setMthForecast(JSON.parse(m));
-      const q = localStorage.getItem('pipelineGenQtrForecast');
-      if (q) setQtrForecast(JSON.parse(q));
-    } catch {}
-    setLoaded(true);
-  }, []);
+  // Server-saved entries for each active period
+  const mthEntry = pipelineGenForecasts.find(f => f.period === mthPrefix) ?? null;
+  const qtrEntry = pipelineGenForecasts.find(f => f.period === qtrKey)    ?? null;
 
-  function updateMthForecast(cat: Category, value: number) {
-    const next = { ...mthForecast, [cat]: value };
-    setMthForecast(next);
-    try { localStorage.setItem('pipelineGenForecast', JSON.stringify(next)); } catch {}
-  }
+  // Section state hooks
+  const mth = useSectionForecast('pgf_' + mthPrefix, mthEntry);
+  const qtr = useSectionForecast('pgf_' + qtrKey,    qtrEntry);
 
-  function updateQtrForecast(cat: Category, value: number) {
-    const next = { ...qtrForecast, [cat]: value };
-    setQtrForecast(next);
-    try { localStorage.setItem('pipelineGenQtrForecast', JSON.stringify(next)); } catch {}
-  }
+  if (!mth.loaded || !qtr.loaded) return null;
 
-  // ── MTD ──
-  const mthPrefix    = latestMonthPrefix(pipelineGen);
-  const mtdDeals     = filterMTD(pipelineGen, mthPrefix);
-  const mtdLwDeals   = filterMTD(pipelineGenLastWeek, mthPrefix);
+  // Derived deal sets
+  const mtdDeals   = filterMTD(pipelineGen,         mthPrefix);
+  const mtdLwDeals = filterMTD(pipelineGenLastWeek,  mthPrefix);
+  const qtdDeals   = filterQTD(pipelineGen,          qtrInfo);
+  const qtdLwDeals = filterQTD(pipelineGenLastWeek,  qtrInfo);
+
   const mtdThrough   = pctThroughMonth(mthPrefix);
+  const qtrThrough   = pctThroughQtr(qtrInfo);
+
   const isMthCurrent = mthPrefix === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const [prefY, prefM] = mthPrefix.split('-').map(Number);
   const monthLabel   = new Date(prefY, prefM - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-
-  // ── QTD ──
-  const qtrInfo      = latestQtrInfo(pipelineGen);
-  const qtdDeals     = filterQTD(pipelineGen, qtrInfo);
-  const qtdLwDeals   = filterQTD(pipelineGenLastWeek, qtrInfo);
-  const qtrThrough   = pctThroughQtr(qtrInfo);
   const quarterLabel = `Q${qtrInfo.q} ${qtrInfo.year}`;
-
-  if (!loaded) return null;
 
   return (
     <div className="space-y-8">
@@ -308,7 +423,6 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: Pi
             No data for the current month yet — showing <strong>{monthLabel}</strong> (most recent available).
           </div>
         )}
-
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-800">
@@ -320,13 +434,18 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: Pi
           </div>
           <ThroughBadge pct={mtdThrough} unit="month" />
         </div>
-
         <PipelineTable
           resultLabel="MTD" forecastLabel="Month"
           results={sumByCategory(mtdDeals)}
           lwResults={sumByCategory(mtdLwDeals)}
-          forecast={mthForecast}
-          onForecast={updateMthForecast}
+          forecast={mth.draft}
+          onForecast={mth.update}
+          isDirty={mth.isDirty}
+          saving={mth.saving}
+          saveOk={mth.saveOk}
+          onSubmit={() => mth.submit(mthPrefix)}
+          onDiscard={mth.discard}
+          updatedAt={mthEntry?.updatedAt}
         />
       </div>
 
@@ -337,7 +456,6 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: Pi
             No data for the current quarter yet — showing <strong>{quarterLabel}</strong> (most recent available).
           </div>
         )}
-
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-800">
@@ -349,19 +467,21 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: Pi
           </div>
           <ThroughBadge pct={qtrThrough} unit="quarter" />
         </div>
-
         <PipelineTable
           resultLabel="QTD" forecastLabel="Quarter"
           results={sumByCategory(qtdDeals)}
           lwResults={sumByCategory(qtdLwDeals)}
-          forecast={qtrForecast}
-          onForecast={updateQtrForecast}
+          forecast={qtr.draft}
+          onForecast={qtr.update}
+          isDirty={qtr.isDirty}
+          saving={qtr.saving}
+          saveOk={qtr.saveOk}
+          onSubmit={() => qtr.submit(qtrKey)}
+          onDiscard={qtr.discard}
+          updatedAt={qtrEntry?.updatedAt}
         />
       </div>
 
-      <p className="text-xs text-gray-400 text-right">
-        Forecast values are saved in your browser per period.
-      </p>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Deal, SDForecastEntry, PipelineGenDeal } from './types';
+import { Deal, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry } from './types';
 import { thisWeekDeals, lastWeekDeals } from './mockData';
 
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwchrLZsUlIAHCVm7bV3orxCXHzxnodFeoDl3svh4jQNUFje6bz2KwtuySdV0mgVKl0Lg/exec';
@@ -7,10 +7,11 @@ export interface SheetData {
   thisWeek:            Deal[];
   lastWeek:            Deal[];
   sdForecasts:         SDForecastEntry[];
-  pipelineGen:         PipelineGenDeal[];
-  pipelineGenLastWeek: PipelineGenDeal[];
-  dataDownloadedAt:    string;
-  fetchedAt:           string;
+  pipelineGen:          PipelineGenDeal[];
+  pipelineGenLastWeek:  PipelineGenDeal[];
+  pipelineGenForecasts: PipelineGenForecastEntry[];
+  dataDownloadedAt:     string;
+  fetchedAt:            string;
 }
 
 export async function fetchDashboardData(): Promise<SheetData> {
@@ -32,13 +33,14 @@ export async function fetchDashboardData(): Promise<SheetData> {
       thisWeek:            data.thisWeek            ?? [],
       lastWeek:            data.lastWeek            ?? [],
       sdForecasts:         data.sdForecasts         ?? [],
-      pipelineGen:         data.pipelineGen         ?? [],
-      pipelineGenLastWeek: data.pipelineGenLastWeek ?? [],
-      dataDownloadedAt:    data.dataDownloadedAt    ?? '',
+      pipelineGen:          data.pipelineGen          ?? [],
+      pipelineGenLastWeek:  data.pipelineGenLastWeek  ?? [],
+      pipelineGenForecasts: data.pipelineGenForecasts ?? [],
+      dataDownloadedAt:     data.dataDownloadedAt     ?? '',
       fetchedAt:           data.fetchedAt           ?? new Date().toISOString(),
     };
   } catch (err) {
     console.error('fetchDashboardData failed, using mock data:', err);
-    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], dataDownloadedAt: '', fetchedAt: new Date().toISOString() };
+    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], pipelineGenForecasts: [], dataDownloadedAt: '', fetchedAt: new Date().toISOString() };
   }
 }
