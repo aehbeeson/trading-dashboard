@@ -22,37 +22,41 @@ function fmtDate(iso: string) {
 
 // ─── Period filters ───────────────────────────────────────────────────────────
 
-function pctThroughMonth(): number {
-  const now  = new Date();
-  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+function pctThroughMonth(year: number, month: number): number {
+  const now = new Date();
+  const curY = now.getFullYear();
+  const curM = now.getMonth() + 1;
+  if (year < curY || (year === curY && month < curM)) return 100;
+  if (year > curY || (year === curY && month > curM)) return 0;
+  const days = new Date(year, month, 0).getDate();
   return Math.round((now.getDate() / days) * 100);
 }
 
-function pctThroughQuarter(): number {
-  const now    = new Date();
-  const q      = Math.ceil((now.getMonth() + 1) / 3);
-  const startM = (q - 1) * 3;
-  const endM   = q * 3 - 1;
-  const qStart = new Date(now.getFullYear(), startM, 1);
-  const qEnd   = new Date(now.getFullYear(), endM + 1, 0);
-  const total  = Math.round((qEnd.getTime() - qStart.getTime()) / 86_400_000) + 1;
+function pctThroughQuarter(year: number, quarter: number): number {
+  const now = new Date();
+  const curY = now.getFullYear();
+  const curQ = Math.ceil((now.getMonth() + 1) / 3);
+  if (year < curY || (year === curY && quarter < curQ)) return 100;
+  if (year > curY || (year === curY && quarter > curQ)) return 0;
+  const startM = (quarter - 1) * 3;
+  const endM   = quarter * 3 - 1;
+  const qStart = new Date(year, startM, 1);
+  const qEnd   = new Date(year, endM + 1, 0);
+  const total   = Math.round((qEnd.getTime() - qStart.getTime()) / 86_400_000) + 1;
   const elapsed = Math.round((now.getTime() - qStart.getTime()) / 86_400_000) + 1;
   return Math.min(100, Math.round((elapsed / total) * 100));
 }
 
-function filterMonth(deals: Deal[], yearOffset = 0): Deal[] {
-  const now = new Date();
-  const y   = now.getFullYear() + yearOffset;
-  const m   = String(now.getMonth() + 1).padStart(2, '0');
+function filterMonth(deals: Deal[], year: number, month: number, yearOffset = 0): Deal[] {
+  const y = year + yearOffset;
+  const m = String(month).padStart(2, '0');
   return deals.filter(d => d.closeDate?.startsWith(`${y}-${m}`));
 }
 
-function filterQuarter(deals: Deal[], yearOffset = 0): Deal[] {
-  const now    = new Date();
-  const y      = now.getFullYear() + yearOffset;
-  const q      = Math.ceil((now.getMonth() + 1) / 3);
-  const startM = (q - 1) * 3 + 1;
-  const endM   = q * 3;
+function filterQuarter(deals: Deal[], year: number, quarter: number, yearOffset = 0): Deal[] {
+  const y      = year + yearOffset;
+  const startM = (quarter - 1) * 3 + 1;
+  const endM   = quarter * 3;
   return deals.filter(d => {
     if (!d.closeDate) return false;
     const dy = parseInt(d.closeDate.substring(0, 4));
@@ -80,63 +84,114 @@ function DeltaCell({ delta, base }: { delta: number | null; base: number | null 
   );
 }
 
-// ─── Comment box ──────────────────────────────────────────────────────────────
+// ─── Area comment box ─────────────────────────────────────────────────────────
 
-function CommentBox({ period, initial, updatedAt: initUpdatedAt }: { period: string; initial: string; updatedAt?: string }) {
-  const [text,    setText]    = useState(initial);
-  const [saved,   setSaved]   = useState(initial);
-  const [saving,  setSaving]  = useState(false);
-  const [savedAt, setSavedAt] = useState(initUpdatedAt);
-  const isDirty = text !== saved;
+function AreaCommentBox({
+  period,
+  initialComments,
+  initialUpdatedAts,
+}: {
+  period: string;
+  initialComments: Record<string, string>;
+  initialUpdatedAts: Record<string, string>;
+}) {
+  const initDrafts: Record<string, string> = {};
+  for (const a of AREAS) initDrafts[a.key] = initialComments[a.key] ?? '';
+
+  const [drafts,    setDrafts]    = useState(initDrafts);
+  const [saved,     setSaved]     = useState(initDrafts);
+  const [isEditing, setIsEditing] = useState(() => AREAS.every(a => !initialComments[a.key]));
+  const [saving,    setSaving]    = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | undefined>(() => {
+    const dates = Object.values(initialUpdatedAts).filter(Boolean).sort();
+    return dates.at(-1);
+  });
 
   async function submit() {
     setSaving(true);
     try {
-      const res = await fetch('/api/overview-comment', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period, comment: text }),
-      });
-      const json = await res.json();
-      if (json.ok) {
-        setSaved(text);
-        setSavedAt(new Date().toISOString());
-      }
+      await Promise.all(
+        AREAS.map(a =>
+          fetch('/api/overview-comment', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ period: `${period}:${a.key}`, comment: drafts[a.key] }),
+          })
+        )
+      );
+      setSaved({ ...drafts });
+      setLastSavedAt(new Date().toISOString());
+      setIsEditing(false);
     } finally {
       setSaving(false);
     }
+  }
+
+  function cancel() {
+    setDrafts({ ...saved });
+    setIsEditing(false);
   }
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
         <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Commentary</span>
-        {savedAt && <span className="text-xs text-gray-400">Last saved: {fmtDate(savedAt)}</span>}
+        {lastSavedAt && (
+          <span className="text-xs text-gray-400">Last saved: {fmtDate(lastSavedAt)}</span>
+        )}
       </div>
-      <div className="p-4 space-y-3">
-        <textarea
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={3}
-          placeholder="Add commentary for this period…"
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none text-slate-700 placeholder-gray-300"
-        />
-        <div className="flex items-center justify-end gap-3">
-          {isDirty && !saving && (
-            <button onClick={() => setText(saved)} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-              Discard
+
+      <div className="divide-y divide-gray-100">
+        {AREAS.map(area => (
+          <div key={area.key} className="px-5 py-3 flex items-start gap-4">
+            <div className="flex items-center gap-2 w-40 shrink-0 pt-2">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: area.accentColor }} />
+              <span className="text-sm font-medium text-slate-700">{area.label}</span>
+            </div>
+            {isEditing ? (
+              <textarea
+                value={drafts[area.key]}
+                onChange={e => setDrafts(prev => ({ ...prev, [area.key]: e.target.value }))}
+                rows={2}
+                placeholder={`Add commentary for ${area.label}…`}
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none text-slate-700 placeholder-gray-300"
+              />
+            ) : (
+              <p className="flex-1 text-sm text-slate-600 pt-2 min-h-[2.5rem]">
+                {saved[area.key] || <span className="text-gray-300 italic">No commentary</span>}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-100 bg-gray-50">
+        {isEditing ? (
+          <>
+            <button
+              onClick={cancel}
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
             </button>
-          )}
+            <button
+              onClick={submit}
+              disabled={saving}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !saving ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {saving ? 'Saving…' : 'Submit'}
+            </button>
+          </>
+        ) : (
           <button
-            onClick={submit}
-            disabled={!isDirty || saving}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              isDirty && !saving ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+            onClick={() => setIsEditing(true)}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
           >
-            {saving ? 'Saving…' : 'Submit'}
+            Edit
           </button>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -145,21 +200,22 @@ function CommentBox({ period, initial, updatedAt: initUpdatedAt }: { period: str
 // ─── Results table ────────────────────────────────────────────────────────────
 
 interface RowData {
-  label:      string;
-  areaKey?:   AreaKey;
+  label:        string;
+  areaKey?:     AreaKey;
   accentColor?: string;
-  cw:         number;
-  wow:        number;
-  wowBase:    number;
-  yoy:        number | null;
-  yoyBase:    number | null;
-  vsM:        number | null;
-  vsMBase:    number | null;
+  cw:           number;
+  sdForecast:   number | null;
+  wow:          number;
+  wowBase:      number;
+  yoy:          number | null;
+  yoyBase:      number | null;
+  vsM:          number | null;
+  vsMBase:      number | null;
 }
 
 interface ResultsTableProps {
-  rows:       RowData[];
-  onAreaClick:(area: AreaKey) => void;
+  rows:        RowData[];
+  onAreaClick: (area: AreaKey) => void;
 }
 
 function ResultsTable({ rows, onAreaClick }: ResultsTableProps) {
@@ -171,6 +227,7 @@ function ResultsTable({ rows, onAreaClick }: ResultsTableProps) {
             <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
               <th className="px-5 py-3.5 text-left font-semibold text-xs uppercase tracking-wide">Area</th>
               <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">Closed Won</th>
+              <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">SD Forecast</th>
               <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">WoW</th>
               <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">YoY</th>
               <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">vs Forecast</th>
@@ -197,6 +254,9 @@ function ResultsTable({ rows, onAreaClick }: ResultsTableProps) {
                     <span className={`font-bold ${row.cw > 0 ? 'text-emerald-700' : 'text-gray-300'}`}>
                       {row.cw > 0 ? fmtFull(row.cw) : '—'}
                     </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <span className="text-gray-300 text-xs italic">TBC</span>
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <DeltaCell delta={row.wow} base={row.wowBase} />
@@ -246,94 +306,183 @@ interface SummaryPageProps {
 }
 
 export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts, overviewComments, onAreaClick }: SummaryPageProps) {
-  const now      = new Date();
-  const curY     = now.getFullYear();
-  const curQ     = Math.ceil((now.getMonth() + 1) / 3);
-  const mthKey   = `${curY}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const qtrKey   = `${curY}-Q${curQ}`;
-  const mthLabel = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  const qtrLabel = `Q${curQ} ${curY}`;
+  const now   = new Date();
+  const curY  = now.getFullYear();
+  const curM  = now.getMonth() + 1;
+  const curQ  = Math.ceil(curM / 3);
 
-  const mthComment = overviewComments.find(c => c.period === mthKey);
-  const qtrComment = overviewComments.find(c => c.period === qtrKey);
+  const [selMthYear,  setSelMthYear]  = useState(curY);
+  const [selMth,      setSelMth]      = useState(curM);
+  const [selQtrYear,  setSelQtrYear]  = useState(curY);
+  const [selQtr,      setSelQtr]      = useState(curQ);
 
-  function buildRows(
-    filterFn:      (d: Deal[], offset?: number) => Deal[],
-    sdPeriod:      'month' | 'quarter',
-  ): RowData[] {
+  // Generate month options — current + 11 prior months
+  const monthOptions = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(curY, curM - 1 - i, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  });
+
+  // Generate quarter options — current + 7 prior quarters
+  const qtrOptions = Array.from({ length: 8 }, (_, i) => {
+    let year = curY;
+    let q    = curQ - i;
+    while (q <= 0) { q += 4; year--; }
+    return { year, quarter: q };
+  });
+
+  const mthKey   = `${selMthYear}-${String(selMth).padStart(2, '0')}`;
+  const qtrKey   = `${selQtrYear}-Q${selQtr}`;
+  const mthLabel = new Date(selMthYear, selMth - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const qtrLabel = `Q${selQtr} ${selQtrYear}`;
+
+  function buildCommentMaps(periodPrefix: string): [Record<string, string>, Record<string, string>] {
+    const comments:   Record<string, string> = {};
+    const updatedAts: Record<string, string> = {};
+    for (const a of AREAS) {
+      const key   = `${periodPrefix}:${a.key}`;
+      const entry = overviewComments.find(c => c.period === key);
+      comments[a.key]   = entry?.comment   ?? '';
+      updatedAts[a.key] = entry?.updatedAt ?? '';
+    }
+    return [comments, updatedAts];
+  }
+
+  const [mthComments, mthUpdatedAts] = buildCommentMaps(mthKey);
+  const [qtrComments, qtrUpdatedAts] = buildCommentMaps(qtrKey);
+
+  function buildMthRows(): RowData[] {
     const rows: RowData[] = [];
-
     for (const area of AREAS) {
-      const twArea   = allThisWeek.filter(d => d.area === area.key);
-      const lwArea   = allLastWeek.filter(d => d.area === area.key);
+      const twArea = allThisWeek.filter(d => d.area === area.key);
+      const lwArea = allLastWeek.filter(d => d.area === area.key);
 
-      const cw       = closedWon(filterFn(twArea));
-      const lwCw     = closedWon(filterFn(lwArea));
-      const priorCw  = closedWon(filterFn(twArea, -1));
+      const cw      = closedWon(filterMonth(twArea, selMthYear, selMth));
+      const lwCw    = closedWon(filterMonth(lwArea, selMthYear, selMth));
+      const priorCw = closedWon(filterMonth(twArea, selMthYear, selMth, -1));
 
       const sd       = sdForecasts.find(f => f.area === area.key);
-      const sdTarget = sd ? sd[sdPeriod].closedWon + sd[sdPeriod].commit : null;
+      const sdTarget = sd ? sd.month.closedWon + sd.month.commit : null;
 
       rows.push({
-        label:       area.label,
-        areaKey:     area.key,
-        accentColor: area.accentColor,
-        cw,
-        wow:         cw - lwCw,
-        wowBase:     lwCw,
-        yoy:         priorCw > 0 || cw > 0 ? cw - priorCw : null,
-        yoyBase:     priorCw > 0 ? priorCw : null,
-        vsM:         sdTarget !== null ? cw - sdTarget : null,
-        vsMBase:     sdTarget,
+        label: area.label, areaKey: area.key, accentColor: area.accentColor,
+        cw, sdForecast: null,
+        wow: cw - lwCw, wowBase: lwCw,
+        yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null,
+        yoyBase: priorCw > 0 ? priorCw : null,
+        vsM: sdTarget !== null ? cw - sdTarget : null,
+        vsMBase: sdTarget,
       });
     }
-
-    // Total row
-    const totalCw    = rows.reduce((s, r) => s + r.cw, 0);
-    const totalWow   = rows.reduce((s, r) => s + r.wow, 0);
-    const totalWowB  = rows.reduce((s, r) => s + r.wowBase, 0);
-    const anyYoy     = rows.some(r => r.yoy !== null);
-    const totalYoy   = anyYoy ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
-    const totalYoyB  = anyYoy ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
-    const anyVsM     = rows.some(r => r.vsM !== null);
-    const totalVsM   = anyVsM ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
-    const totalVsMB  = anyVsM ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
-
-    rows.push({
-      label: 'Total', cw: totalCw,
-      wow: totalWow, wowBase: totalWowB,
-      yoy: totalYoy, yoyBase: totalYoyB,
-      vsM: totalVsM, vsMBase: totalVsMB,
-    });
-
+    const totalCw   = rows.reduce((s, r) => s + r.cw, 0);
+    const totalWow  = rows.reduce((s, r) => s + r.wow, 0);
+    const totalWowB = rows.reduce((s, r) => s + r.wowBase, 0);
+    const anyYoy    = rows.some(r => r.yoy !== null);
+    const totalYoy  = anyYoy ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
+    const totalYoyB = anyYoy ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
+    const anyVsM    = rows.some(r => r.vsM !== null);
+    const totalVsM  = anyVsM ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
+    const totalVsMB = anyVsM ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
+    rows.push({ label: 'Total', cw: totalCw, sdForecast: null, wow: totalWow, wowBase: totalWowB, yoy: totalYoy, yoyBase: totalYoyB, vsM: totalVsM, vsMBase: totalVsMB });
     return rows;
   }
 
-  const mthRows = buildRows(filterMonth, 'month');
-  const qtrRows = buildRows(filterQuarter, 'quarter');
+  function buildQtrRows(): RowData[] {
+    const rows: RowData[] = [];
+    for (const area of AREAS) {
+      const twArea = allThisWeek.filter(d => d.area === area.key);
+      const lwArea = allLastWeek.filter(d => d.area === area.key);
+
+      const cw      = closedWon(filterQuarter(twArea, selQtrYear, selQtr));
+      const lwCw    = closedWon(filterQuarter(lwArea, selQtrYear, selQtr));
+      const priorCw = closedWon(filterQuarter(twArea, selQtrYear, selQtr, -1));
+
+      const sd       = sdForecasts.find(f => f.area === area.key);
+      const sdTarget = sd ? sd.quarter.closedWon + sd.quarter.commit : null;
+
+      rows.push({
+        label: area.label, areaKey: area.key, accentColor: area.accentColor,
+        cw, sdForecast: null,
+        wow: cw - lwCw, wowBase: lwCw,
+        yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null,
+        yoyBase: priorCw > 0 ? priorCw : null,
+        vsM: sdTarget !== null ? cw - sdTarget : null,
+        vsMBase: sdTarget,
+      });
+    }
+    const totalCw   = rows.reduce((s, r) => s + r.cw, 0);
+    const totalWow  = rows.reduce((s, r) => s + r.wow, 0);
+    const totalWowB = rows.reduce((s, r) => s + r.wowBase, 0);
+    const anyYoy    = rows.some(r => r.yoy !== null);
+    const totalYoy  = anyYoy ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
+    const totalYoyB = anyYoy ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
+    const anyVsM    = rows.some(r => r.vsM !== null);
+    const totalVsM  = anyVsM ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
+    const totalVsMB = anyVsM ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
+    rows.push({ label: 'Total', cw: totalCw, sdForecast: null, wow: totalWow, wowBase: totalWowB, yoy: totalYoy, yoyBase: totalYoyB, vsM: totalVsM, vsMBase: totalVsMB });
+    return rows;
+  }
+
+  function handleMthChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const [y, m] = e.target.value.split('-').map(Number);
+    setSelMthYear(y);
+    setSelMth(m);
+  }
+
+  function handleQtrChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const [y, q] = e.target.value.split('-').map(Number);
+    setSelQtrYear(y);
+    setSelQtr(q);
+  }
 
   return (
     <div className="space-y-8">
 
       {/* ── Month section ── */}
       <div className="space-y-4">
-        <SectionHeader title={`${mthLabel} Results`} pct={pctThroughMonth()} unit="month" />
-        <ResultsTable rows={mthRows} onAreaClick={onAreaClick} />
-        <CommentBox
+        <div className="flex items-center justify-between gap-4">
+          <SectionHeader title={`${mthLabel} Results`} pct={pctThroughMonth(selMthYear, selMth)} unit="month" />
+          <select
+            value={`${selMthYear}-${selMth}`}
+            onChange={handleMthChange}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+          >
+            {monthOptions.map(({ year, month }) => {
+              const label = new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+              return (
+                <option key={`${year}-${month}`} value={`${year}-${month}`}>{label}</option>
+              );
+            })}
+          </select>
+        </div>
+        <ResultsTable rows={buildMthRows()} onAreaClick={onAreaClick} />
+        <AreaCommentBox
+          key={mthKey}
           period={mthKey}
-          initial={mthComment?.comment ?? ''}
-          updatedAt={mthComment?.updatedAt}
+          initialComments={mthComments}
+          initialUpdatedAts={mthUpdatedAts}
         />
       </div>
 
       {/* ── Quarter section ── */}
       <div className="space-y-4">
-        <SectionHeader title={`${qtrLabel} Results`} pct={pctThroughQuarter()} unit="qtr" />
-        <ResultsTable rows={qtrRows} onAreaClick={onAreaClick} />
-        <CommentBox
+        <div className="flex items-center justify-between gap-4">
+          <SectionHeader title={`${qtrLabel} Results`} pct={pctThroughQuarter(selQtrYear, selQtr)} unit="qtr" />
+          <select
+            value={`${selQtrYear}-${selQtr}`}
+            onChange={handleQtrChange}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+          >
+            {qtrOptions.map(({ year, quarter }) => (
+              <option key={`${year}-${quarter}`} value={`${year}-${quarter}`}>Q{quarter} {year}</option>
+            ))}
+          </select>
+        </div>
+        <ResultsTable rows={buildQtrRows()} onAreaClick={onAreaClick} />
+        <AreaCommentBox
+          key={qtrKey}
           period={qtrKey}
-          initial={qtrComment?.comment ?? ''}
-          updatedAt={qtrComment?.updatedAt}
+          initialComments={qtrComments}
+          initialUpdatedAts={qtrUpdatedAts}
         />
       </div>
 

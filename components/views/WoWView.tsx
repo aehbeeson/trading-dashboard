@@ -41,56 +41,142 @@ function hasChanged(deal: Deal, prev: Deal | undefined): boolean {
     || prev.value !== deal.value;
 }
 
+type TileKey = 'net' | 'added' | 'removed' | 'changed';
+
 export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProps) {
-  const [showAll, setShowAll] = useState(false);
+  const [showAll,    setShowAll]    = useState(false);
+  const [activeTile, setActiveTile] = useState<TileKey | null>(null);
 
   const lwMap  = new Map(allLastWeek.map(d => [d.id, d]));
   const twIds  = new Set(thisWeek.map(d => d.id));
 
-  // Net movement using date-filtered lastWeek
-  const removedDeals  = lastWeek.filter(d => !twIds.has(d.id));
-  const newDeals      = thisWeek.filter(d => !lwMap.has(d.id));
-  const newARR        = newDeals.reduce((s, d) => s + d.value, 0);
-  const removedARR    = removedDeals.reduce((s, d) => s + d.value, 0);
-  const changedDelta  = thisWeek
+  const removedDeals      = lastWeek.filter(d => !twIds.has(d.id));
+  const newDeals          = thisWeek.filter(d => !lwMap.has(d.id));
+  const valueChangedDeals = thisWeek.filter(d => lwMap.has(d.id) && d.value !== lwMap.get(d.id)!.value);
+  const newARR            = newDeals.reduce((s, d) => s + d.value, 0);
+  const removedARR        = removedDeals.reduce((s, d) => s + d.value, 0);
+  const changedDelta      = thisWeek
     .filter(d => lwMap.has(d.id))
     .reduce((s, d) => s + (d.value - lwMap.get(d.id)!.value), 0);
   const net = newARR - removedARR + changedDelta;
 
-  const sorted   = [...thisWeek].sort((a, b) => a.closeDate.localeCompare(b.closeDate));
-  const changed  = sorted.filter(d => hasChanged(d, lwMap.get(d.id)));
-  const visible  = showAll ? sorted : changed;
+  const sorted  = [...thisWeek].sort((a, b) => a.closeDate.localeCompare(b.closeDate));
+  const changed = sorted.filter(d => hasChanged(d, lwMap.get(d.id)));
+
+  // removedSet lets the table renderer know which rows are "removed" (from lastWeek)
+  const removedSet = new Set(removedDeals.map(d => d.id));
+
+  // Determine which deals to show based on active tile or default toggle
+  let tableDeals: Deal[];
+  let tableRemovedSet: Set<string>;
+  let caption: string;
+
+  if (activeTile === 'added') {
+    tableDeals      = newDeals;
+    tableRemovedSet = new Set();
+    caption         = `${newDeals.length} deal${newDeals.length !== 1 ? 's' : ''} added this week`;
+  } else if (activeTile === 'removed') {
+    tableDeals      = removedDeals;
+    tableRemovedSet = removedSet;
+    caption         = `${removedDeals.length} deal${removedDeals.length !== 1 ? 's' : ''} removed this week`;
+  } else if (activeTile === 'changed') {
+    tableDeals      = valueChangedDeals;
+    tableRemovedSet = new Set();
+    caption         = `${valueChangedDeals.length} deal${valueChangedDeals.length !== 1 ? 's' : ''} with value changes`;
+  } else if (activeTile === 'net') {
+    const combined  = [...changed, ...removedDeals].sort((a, b) => a.closeDate.localeCompare(b.closeDate));
+    tableDeals      = combined;
+    tableRemovedSet = removedSet;
+    caption         = `${combined.length} deal${combined.length !== 1 ? 's' : ''} contributing to net movement`;
+  } else {
+    tableDeals      = showAll ? sorted : changed;
+    tableRemovedSet = new Set();
+    caption         = showAll
+      ? `Showing all ${sorted.length} deals`
+      : `Showing ${changed.length} deal${changed.length !== 1 ? 's' : ''} with changes`;
+  }
+
+  function toggleTile(key: TileKey) {
+    setActiveTile(prev => prev === key ? null : key);
+  }
+
+  const tiles: { key: TileKey; label: string; value: string; color: string; border: string; activeBg: string; count: number }[] = [
+    {
+      key:      'net',
+      label:    'Net Movement',
+      value:    (net >= 0 ? '+' : '') + fmt(net),
+      color:    net >= 0 ? 'text-emerald-600' : 'text-red-500',
+      border:   'border-gray-200',
+      activeBg: 'bg-gray-50',
+      count:    changed.length + removedDeals.length,
+    },
+    {
+      key:      'added',
+      label:    'Added',
+      value:    '+' + fmt(newARR),
+      color:    'text-emerald-600',
+      border:   'border-emerald-200',
+      activeBg: 'bg-emerald-50',
+      count:    newDeals.length,
+    },
+    {
+      key:      'removed',
+      label:    'Removed',
+      value:    '-' + fmt(removedARR),
+      color:    'text-red-500',
+      border:   'border-red-200',
+      activeBg: 'bg-red-50',
+      count:    removedDeals.length,
+    },
+    {
+      key:      'changed',
+      label:    'Value Changes',
+      value:    (changedDelta >= 0 ? '+' : '') + fmt(changedDelta),
+      color:    changedDelta >= 0 ? 'text-emerald-600' : 'text-red-500',
+      border:   'border-blue-200',
+      activeBg: 'bg-blue-50',
+      count:    valueChangedDeals.length,
+    },
+  ];
 
   return (
     <div>
-      {/* Summary cards */}
+      {/* Summary tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Net Movement',  value: (net >= 0 ? '+' : '') + fmt(net),              color: net >= 0 ? 'text-emerald-600' : 'text-red-500',              border: 'border-gray-200'    },
-          { label: 'Added',         value: '+' + fmt(newARR),                              color: 'text-emerald-600',                                            border: 'border-emerald-200' },
-          { label: 'Removed',       value: '-' + fmt(removedARR),                         color: 'text-red-500',                                                border: 'border-red-200'     },
-          { label: 'Value Changes', value: (changedDelta >= 0 ? '+' : '') + fmt(changedDelta), color: changedDelta >= 0 ? 'text-emerald-600' : 'text-red-500', border: 'border-blue-200'    },
-        ].map(m => (
-          <div key={m.label} className={`bg-white rounded-xl border p-4 ${m.border}`}>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{m.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${m.color}`}>{m.value}</p>
-          </div>
-        ))}
+        {tiles.map(t => {
+          const isActive = activeTile === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => toggleTile(t.key)}
+              className={`text-left rounded-xl border p-4 transition-all ${t.border} ${
+                isActive
+                  ? `${t.activeBg} ring-2 ring-offset-1 ring-blue-400 shadow-md`
+                  : 'bg-white hover:shadow-sm hover:border-blue-200'
+              }`}
+            >
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.label}</p>
+              <p className={`text-2xl font-bold mt-1 ${t.color}`}>{t.value}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {t.count} deal{t.count !== 1 ? 's' : ''}
+                {isActive ? ' — click to clear' : ''}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Detail table */}
+      {/* Detail table controls */}
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-gray-500">
-          {showAll
-            ? `Showing all ${sorted.length} deals`
-            : `Showing ${changed.length} deal${changed.length !== 1 ? 's' : ''} with changes`}
-        </p>
-        <button
-          onClick={() => setShowAll(v => !v)}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-        >
-          {showAll ? `Changes only (${changed.length})` : `Show all (${sorted.length})`}
-        </button>
+        <p className="text-sm text-gray-500">{caption}</p>
+        {activeTile === null && (
+          <button
+            onClick={() => setShowAll(v => !v)}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            {showAll ? `Changes only (${changed.length})` : `Show all (${sorted.length})`}
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -109,20 +195,21 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {visible.map((deal, i) => {
-                const prev   = lwMap.get(deal.id);
-                const isNew  = !prev;
-                const rowBg  = i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
+              {tableDeals.map((deal, i) => {
+                const isRemoved = tableRemovedSet.has(deal.id);
+                const prev      = isRemoved ? deal : lwMap.get(deal.id);
+                const isNew     = !isRemoved && !prev;
+                const rowBg     = i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
 
-                const dateChanged  = prev && prev.closeDate !== deal.closeDate;
+                const dateChanged  = !isNew && !isRemoved && prev && prev.closeDate !== deal.closeDate;
                 const dateLater    = dateChanged && deal.closeDate > prev!.closeDate;
                 const dateEarlier  = dateChanged && deal.closeDate < prev!.closeDate;
 
-                const fcChanged    = prev && prev.forecastCategory !== deal.forecastCategory;
+                const fcChanged    = !isNew && !isRemoved && prev && prev.forecastCategory !== deal.forecastCategory;
                 const fcImproved   = fcChanged && (FC_ORDER[deal.forecastCategory] ?? 0) > (FC_ORDER[prev!.forecastCategory] ?? 0);
                 const fcDowngraded = fcChanged && (FC_ORDER[deal.forecastCategory] ?? 0) < (FC_ORDER[prev!.forecastCategory] ?? 0);
 
-                const delta = isNew ? deal.value : deal.value - prev!.value;
+                const delta = isNew ? deal.value : isRemoved ? -deal.value : deal.value - prev!.value;
 
                 return (
                   <tr key={deal.id} className={rowBg}>
@@ -130,16 +217,19 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
 
                     {/* Close date last week */}
                     <td className="px-4 py-2.5 text-gray-500 text-xs">
-                      {isNew ? <span className="text-emerald-600 font-medium">New</span> : fmtDate(prev!.closeDate)}
+                      {isNew
+                        ? <span className="text-emerald-600 font-medium">New</span>
+                        : fmtDate(prev!.closeDate)}
                     </td>
 
-                    {/* Close date current — highlight if changed */}
-                    <td className={`px-4 py-2.5 text-xs font-medium rounded-sm ${
-                      dateLater   ? 'bg-red-100 text-red-700'   :
-                      dateEarlier ? 'bg-green-100 text-green-700' :
+                    {/* Close date current */}
+                    <td className={`px-4 py-2.5 text-xs font-medium ${
+                      isRemoved   ? 'text-red-400 italic'           :
+                      dateLater   ? 'bg-red-100 text-red-700'       :
+                      dateEarlier ? 'bg-green-100 text-green-700'   :
                       'text-gray-700'
                     }`}>
-                      {fmtDate(deal.closeDate)}
+                      {isRemoved ? 'Removed' : fmtDate(deal.closeDate)}
                     </td>
 
                     {/* Forecast last week */}
@@ -147,13 +237,14 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
                       {isNew ? '-' : prev!.forecastCategory}
                     </td>
 
-                    {/* Forecast current — highlight if changed */}
+                    {/* Forecast current */}
                     <td className={`px-4 py-2.5 text-xs font-medium ${
+                      isRemoved    ? 'text-red-400 italic'         :
                       fcImproved   ? 'bg-green-100 text-green-700' :
                       fcDowngraded ? 'bg-red-100 text-red-700'     :
                       'text-gray-700'
                     }`}>
-                      {deal.forecastCategory}
+                      {isRemoved ? '—' : deal.forecastCategory}
                     </td>
 
                     {/* Deal value last week */}
@@ -163,14 +254,15 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
 
                     {/* Deal value current */}
                     <td className="px-4 py-2.5 text-right font-medium text-slate-800">
-                      {fmtK(deal.value)}
+                      {isRemoved ? '-' : fmtK(deal.value)}
                     </td>
 
                     {/* Change in deal value */}
                     <td className={`px-4 py-2.5 text-right font-medium ${
-                      delta < 0 ? 'bg-red-100 text-red-700' :
+                      isRemoved           ? 'bg-red-100 text-red-700'   :
+                      delta < 0           ? 'bg-red-100 text-red-700'   :
                       delta > 0 && !isNew ? 'bg-green-100 text-green-700' :
-                      isNew ? 'text-emerald-600' :
+                      isNew               ? 'text-emerald-600'           :
                       'text-gray-400'
                     }`}>
                       {isNew ? fmtK(deal.value) : fmtDelta(delta)}
@@ -178,6 +270,11 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
                   </tr>
                 );
               })}
+              {tableDeals.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400 italic">No deals</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
