@@ -87,7 +87,7 @@ function Section({ title, deals, headerBg, headerText, defaultOpen, sortKey }: S
         ) : (
           sorted.map((deal, i) => (
             <tr key={deal.id} className={`hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-              <td className="px-5 py-2.5 font-medium text-slate-800">{deal.company}</td>
+              <td className="px-5 py-2.5 font-medium text-slate-800 truncate max-w-0" title={deal.company}>{deal.company}</td>
               <td className="px-5 py-2.5 text-right text-gray-600">{deal.owner}</td>
               <td className="px-5 py-2.5 text-right">
                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${FORECAST_BADGE[deal.forecastCategory]}`}>
