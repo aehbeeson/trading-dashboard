@@ -11,25 +11,31 @@ interface DashboardProps {
   fetchedAt: string;
 }
 
-function toISO(d: Date) {
-  return d.toISOString().substring(0, 10);
+// Build YYYY-MM-DD from local date components to avoid UTC timezone shifts
+function localISO(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function monthRange(): [string, string] {
-  const now = new Date();
-  return [
-    toISO(new Date(now.getFullYear(), now.getMonth(), 1)),
-    toISO(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-  ];
+  const now  = new Date();
+  const y    = now.getFullYear();
+  const m    = now.getMonth() + 1; // 1-based
+  const last = new Date(y, m, 0).getDate();
+  return [localISO(y, m, 1), localISO(y, m, last)];
 }
 
 function quarterRange(): [string, string] {
-  const now = new Date();
-  const q  = Math.floor(now.getMonth() / 3);
-  return [
-    toISO(new Date(now.getFullYear(), q * 3, 1)),
-    toISO(new Date(now.getFullYear(), q * 3 + 3, 0)),
-  ];
+  const now      = new Date();
+  const y        = now.getFullYear();
+  const qStart   = Math.floor(now.getMonth() / 3) * 3 + 1; // 1-based start month
+  const qEnd     = qStart + 2;
+  const lastDay  = new Date(y, qEnd, 0).getDate();
+  return [localISO(y, qStart, 1), localISO(y, qEnd, lastDay)];
+}
+
+function yearRange(): [string, string] {
+  const y = new Date().getFullYear();
+  return [localISO(y, 1, 1), localISO(y, 12, 31)];
 }
 
 function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
@@ -61,17 +67,19 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
     setActiveSubTab('results');
   }
 
-  function applyPreset(preset: 'month' | 'quarter' | 'all') {
+  function applyPreset(preset: 'month' | 'quarter' | 'year') {
     if (preset === 'month')   { const [f, t] = monthRange();   setFilterFrom(f); setFilterTo(t); }
     if (preset === 'quarter') { const [f, t] = quarterRange(); setFilterFrom(f); setFilterTo(t); }
-    if (preset === 'all')     { setFilterFrom(''); setFilterTo(''); }
+    if (preset === 'year')    { const [f, t] = yearRange();    setFilterFrom(f); setFilterTo(t); }
   }
 
   const [mFrom, mTo] = monthRange();
   const [qFrom, qTo] = quarterRange();
+  const [yFrom, yTo] = yearRange();
   const isMonth   = filterFrom === mFrom && filterTo === mTo;
   const isQuarter = filterFrom === qFrom && filterTo === qTo;
-  const isAll     = !filterFrom && !filterTo;
+  const isYear    = filterFrom === yFrom && filterTo === yTo;
+  const isCustom  = !isMonth && !isQuarter && !isYear;
 
   const fetchTime = new Date(fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const weekLabel = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -100,7 +108,8 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
           <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1">
             {presetBtn('This Month',   isMonth,   () => applyPreset('month'))}
             {presetBtn('This Quarter', isQuarter, () => applyPreset('quarter'))}
-            {presetBtn('All',          isAll,     () => applyPreset('all'))}
+            {presetBtn('This Year',    isYear,    () => applyPreset('year'))}
+            {isCustom && presetBtn('Custom', true, () => {})}
           </div>
 
           {/* Date inputs */}
