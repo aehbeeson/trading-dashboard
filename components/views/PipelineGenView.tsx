@@ -28,15 +28,27 @@ function fmtPct(actual: number, target: number) {
   return Math.round((actual / target) * 100) + '%';
 }
 
-function pctThrough(): number {
-  const now  = new Date();
+function pctThrough(prefix: string): number {
+  const now    = new Date();
+  const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  if (prefix !== current) return 100; // past month — fully elapsed
   const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   return Math.round((now.getDate() / days) * 100);
 }
 
-function filterMTD(deals: PipelineGenDeal[]): PipelineGenDeal[] {
+function latestMonthPrefix(deals: PipelineGenDeal[]): string {
   const now    = new Date();
-  const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const hasCurrentMonth = deals.some(d => d.createDate.startsWith(current));
+  if (hasCurrentMonth) return current;
+  // Fall back to the most recent month present in the data
+  const prefixes = deals.map(d => d.createDate.substring(0, 7)).filter(Boolean);
+  if (!prefixes.length) return current;
+  return prefixes.sort().at(-1)!;
+}
+
+function filterMTD(deals: PipelineGenDeal[]): PipelineGenDeal[] {
+  const prefix = latestMonthPrefix(deals);
   return deals.filter(d => d.createDate.startsWith(prefix));
 }
 
@@ -111,18 +123,22 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: Pi
     try { localStorage.setItem('pipelineGenForecast', JSON.stringify(next)); } catch {}
   }
 
-  const mtdDeals = filterMTD(pipelineGen);
-  const lwDeals  = filterMTD(pipelineGenLastWeek);
+  const activePrefix = latestMonthPrefix(pipelineGen);
+  const mtdDeals     = filterMTD(pipelineGen);
+  const lwDeals      = filterMTD(pipelineGenLastWeek);
 
   const mtd     = sumByCategory(mtdDeals);
   const lw      = sumByCategory(lwDeals);
-  const through = pctThrough();
+  const through = pctThrough(activePrefix);
 
   const mtdTotal = CATEGORIES.reduce((s, c) => s + mtd[c], 0);
   const lwTotal  = CATEGORIES.reduce((s, c) => s + lw[c], 0);
   const frcTotal = CATEGORIES.reduce((s, c) => s + forecast[c], 0);
 
-  const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const [prefixYear, prefixMonth] = activePrefix.split('-').map(Number);
+  const activeDate  = new Date(prefixYear, prefixMonth - 1, 1);
+  const monthLabel  = activeDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const isCurrent   = activePrefix === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   if (!loaded) return null;
 
@@ -130,10 +146,16 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek }: Pi
     <div className="space-y-5">
 
       {/* ── Header ── */}
+      {!isCurrent && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-800">
+          No data for the current month yet — showing <strong>{monthLabel}</strong> (most recent available).
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-800">
-            MTD Pipeline Generation Results
+            {isCurrent ? 'MTD' : ''} Pipeline Generation Results
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">
             {monthLabel} · New Business · grouped by deal create date &amp; source type
