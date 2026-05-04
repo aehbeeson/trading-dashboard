@@ -11,6 +11,7 @@ export interface Deal {
   forecastCategory: ForecastCategory;
   closeDate: string;
   area: AreaKey;
+  probability: number; // 0–1, where 1 = Closed Won, 0 = Closed Lost
 }
 
 export interface AreaConfig {

@@ -65,6 +65,7 @@ function readTab(ss, tabName) {
     PIPELINE_STAGE: findCol(H, ['Pipeline Stage', 'Deal Stage'],                                 37),
     NB_SPLIT:       findCol(H, ['NB Split'],                                                     42),
     CS_SPLIT:       findCol(H, ['CS Split'],                                                     43),
+    PROBABILITY:    findCol(H, ['Probability (%)', 'Deal probability', 'Probability'],           -1),
   };
   Logger.log(tabName + ' resolved columns: ' + JSON.stringify(C));
 
@@ -113,7 +114,13 @@ function readTab(ss, tabName) {
     var nbSplit = parseSplit(C.NB_SPLIT >= 0 ? row[C.NB_SPLIT] : null);
     var csSplit = parseSplit(C.CS_SPLIT >= 0 ? row[C.CS_SPLIT] : null);
 
-    var base = { company: company, owner: owner, stage: stage, forecastCategory: forecastCategory, closeDate: closeDate };
+    var prob = 0;
+    if (C.PROBABILITY >= 0 && row[C.PROBABILITY] !== '') {
+      prob = parseFloat(String(row[C.PROBABILITY] || '0').replace(/[%,\s]/g, '')) || 0;
+      if (prob > 1) prob = prob / 100; // normalize percentage (0-100) to decimal (0-1)
+    }
+
+    var base = { company: company, owner: owner, stage: stage, forecastCategory: forecastCategory, closeDate: closeDate, probability: prob };
 
     if (pipeline === 'Resellers') {
       // Resellers: NB Split holds the reseller value (falls back to full Amount)
