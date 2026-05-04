@@ -24,15 +24,15 @@ function getDashboardData() {
   return result;
 }
 
-// Case-insensitive column finder — tries each candidate name in order
-function findCol(H, candidates) {
+// Case-insensitive column finder — returns defaultIdx if no header matches
+function findCol(H, candidates, defaultIdx) {
   for (var i = 0; i < candidates.length; i++) {
     var target = candidates[i].toLowerCase().trim();
     for (var key in H) {
       if (key.toLowerCase().trim() === target) return H[key];
     }
   }
-  return -1;
+  return defaultIdx !== undefined ? defaultIdx : -1;
 }
 
 function readTab(ss, tabName) {
@@ -47,18 +47,18 @@ function readTab(ss, tabName) {
   rows[0].forEach(function(h, i) { H[String(h).trim()] = i; });
   Logger.log(tabName + ' headers: ' + JSON.stringify(Object.keys(H)));
 
-  // Add or adjust candidate names here to match your sheet's actual header text
+  // Header name takes priority; hardcoded index is the fallback if name not found
   var C = {
-    DEAL_ID:        findCol(H, ['Deal ID', 'Record ID', 'ID']),
-    COMPANY_NAME:   findCol(H, ['Company Name', 'Company', 'Account Name']),
-    DEAL_OWNER:     findCol(H, ['Deal Owner', 'Owner', 'Deal owner']),
-    AMOUNT:         findCol(H, ['Amount', 'ARR', 'Annual Revenue']),
-    FORECAST_CAT:   findCol(H, ['Forecast Category', 'Hubspot Forecast Category', 'Forecast category', 'HS Forecast Category']),
-    PIPELINE:       findCol(H, ['Pipeline']),
-    CLOSE_DATE:     findCol(H, ['Close Date', 'Close date', 'Closedate']),
-    CLEAN_COMPANY:  findCol(H, ['Clean Company', 'Cleaned Company', 'clean_company']),
-    CLOSE_DATE_C:   findCol(H, ['Close Date Clean', 'Clean Close Date', 'Closedate Clean']),
-    PIPELINE_STAGE: findCol(H, ['Pipeline Stage', 'Deal Stage', 'Stage', 'Lifecycle Stage'])
+    DEAL_ID:        findCol(H, ['Deal ID', 'Record ID', 'ID'],                                                              0),
+    COMPANY_NAME:   findCol(H, ['Company Name', 'Company', 'Account Name'],                                                 2),
+    DEAL_OWNER:     findCol(H, ['Deal Owner', 'Owner', 'Deal owner'],                                                      12),
+    AMOUNT:         findCol(H, ['Amount', 'ARR', 'Annual Revenue'],                                                         6),
+    FORECAST_CAT:   findCol(H, ['Forecast Category', 'Hubspot Forecast Category', 'Forecast category', 'HS Forecast Category'], 10),
+    PIPELINE:       findCol(H, ['Pipeline'],                                                                               13),
+    CLOSE_DATE:     findCol(H, ['Close Date', 'Close date', 'Closedate'],                                                  15),
+    CLEAN_COMPANY:  findCol(H, ['Clean Company', 'Cleaned Company', 'clean_company'],                                      23),
+    CLOSE_DATE_C:   findCol(H, ['Close Date Clean', 'Clean Close Date', 'Closedate Clean'],                                28),
+    PIPELINE_STAGE: findCol(H, ['Pipeline Stage', 'Deal Stage', 'Stage', 'Lifecycle Stage'],                              37)
   };
   Logger.log('Resolved columns: ' + JSON.stringify(C));
 
