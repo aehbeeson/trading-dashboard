@@ -1,7 +1,7 @@
 import { fetchDashboardData } from '@/lib/sheets';
 import Dashboard from '@/components/Dashboard';
 
-export const revalidate = 300; // Re-fetch from Google Sheets every 5 minutes
+export const dynamic = 'force-dynamic'; // Render on request, not at build time
 
 export default async function Home() {
   const data = await fetchDashboardData();
