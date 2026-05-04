@@ -11,6 +11,27 @@ interface DashboardProps {
   fetchedAt: string;
 }
 
+function toISO(d: Date) {
+  return d.toISOString().substring(0, 10);
+}
+
+function monthRange(): [string, string] {
+  const now = new Date();
+  return [
+    toISO(new Date(now.getFullYear(), now.getMonth(), 1)),
+    toISO(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  ];
+}
+
+function quarterRange(): [string, string] {
+  const now = new Date();
+  const q  = Math.floor(now.getMonth() / 3);
+  return [
+    toISO(new Date(now.getFullYear(), q * 3, 1)),
+    toISO(new Date(now.getFullYear(), q * 3 + 3, 0)),
+  ];
+}
+
 function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
   if (!from && !to) return deals;
   return deals.filter(d => {
@@ -22,11 +43,13 @@ function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
   });
 }
 
+const [defaultFrom, defaultTo] = monthRange();
+
 export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardProps) {
   const [activeArea,   setActiveArea]   = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('results');
-  const [filterFrom,   setFilterFrom]   = useState('');
-  const [filterTo,     setFilterTo]     = useState('');
+  const [filterFrom,   setFilterFrom]   = useState(defaultFrom);
+  const [filterTo,     setFilterTo]     = useState(defaultTo);
 
   const filteredThisWeek = filterByDate(thisWeek, filterFrom, filterTo);
   const filteredLastWeek = filterByDate(lastWeek, filterFrom, filterTo);
@@ -38,21 +61,50 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
     setActiveSubTab('results');
   }
 
+  function applyPreset(preset: 'month' | 'quarter' | 'all') {
+    if (preset === 'month')   { const [f, t] = monthRange();   setFilterFrom(f); setFilterTo(t); }
+    if (preset === 'quarter') { const [f, t] = quarterRange(); setFilterFrom(f); setFilterTo(t); }
+    if (preset === 'all')     { setFilterFrom(''); setFilterTo(''); }
+  }
+
+  const [mFrom, mTo] = monthRange();
+  const [qFrom, qTo] = quarterRange();
+  const isMonth   = filterFrom === mFrom && filterTo === mTo;
+  const isQuarter = filterFrom === qFrom && filterTo === qTo;
+  const isAll     = !filterFrom && !filterTo;
+
   const fetchTime = new Date(fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const weekLabel = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const presetBtn = (label: string, active: boolean, onClick: () => void) => (
+    <button
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+        active ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-slate-900 text-white shadow-lg">
-        <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center gap-6">
+        <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center gap-4">
           <div className="flex-1">
             <h1 className="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
             <p className="text-slate-400 text-sm mt-0.5">Week of {weekLabel}</p>
           </div>
 
-          {/* Date filter */}
+          {/* Quick presets */}
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1">
+            {presetBtn('This Month',   isMonth,   () => applyPreset('month'))}
+            {presetBtn('This Quarter', isQuarter, () => applyPreset('quarter'))}
+            {presetBtn('All',          isAll,     () => applyPreset('all'))}
+          </div>
+
+          {/* Date inputs */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-xs">Close date</span>
             <input
               type="date"
               value={filterFrom}
@@ -66,14 +118,6 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
               onChange={e => setFilterTo(e.target.value)}
               className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
             />
-            {(filterFrom || filterTo) && (
-              <button
-                onClick={() => { setFilterFrom(''); setFilterTo(''); }}
-                className="text-xs text-slate-400 hover:text-red-400 underline"
-              >
-                Clear
-              </button>
-            )}
           </div>
 
           <div className="text-right">
