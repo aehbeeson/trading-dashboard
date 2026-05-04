@@ -127,11 +127,12 @@ function mapEqual(a: ForecastMap, b: ForecastMap): boolean {
 }
 
 function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEntry | null) {
-  const [draft,   setDraft]   = useState<ForecastMap>(EMPTY_FORECAST);
-  const [saved,   setSaved]   = useState<ForecastMap>(EMPTY_FORECAST);
-  const [saving,  setSaving]  = useState(false);
-  const [saveOk,  setSaveOk]  = useState(false);
-  const [loaded,  setLoaded]  = useState(false);
+  const [draft,     setDraft]     = useState<ForecastMap>(EMPTY_FORECAST);
+  const [saved,     setSaved]     = useState<ForecastMap>(EMPTY_FORECAST);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [saveOk,    setSaveOk]    = useState(false);
+  const [loaded,    setLoaded]    = useState(false);
 
   useEffect(() => {
     const fromServer = serverEntry ? entryToMap(serverEntry) : null;
@@ -146,6 +147,8 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
     }
     setDraft(initial);
     setSaved(initial);
+    // Start in edit mode only if there's nothing saved to Sheets yet
+    setIsEditing(!fromServer);
     setLoaded(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -157,6 +160,14 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
     setDraft(next);
     setSaveOk(false);
     try { localStorage.setItem(localKey, JSON.stringify(next)); } catch {}
+  }
+
+  function startEdit() { setIsEditing(true); setSaveOk(false); }
+
+  function cancel() {
+    setDraft(saved);
+    setIsEditing(false);
+    try { localStorage.setItem(localKey, JSON.stringify(saved)); } catch {}
   }
 
   async function submit(period: string) {
@@ -177,6 +188,7 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
       if (json.ok) {
         setSaved(draft);
         setSaveOk(true);
+        setIsEditing(false);
         setTimeout(() => setSaveOk(false), 3000);
       }
     } finally {
@@ -184,12 +196,7 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
     }
   }
 
-  function discard() {
-    setDraft(saved);
-    try { localStorage.setItem(localKey, JSON.stringify(saved)); } catch {}
-  }
-
-  return { draft, update, isDirty, saving, saveOk, submit, discard, loaded };
+  return { draft, update, isDirty, isEditing, startEdit, cancel, saving, saveOk, submit, loaded };
 }
 
 // ─── £k input ────────────────────────────────────────────────────────────────
@@ -235,18 +242,20 @@ interface PipelineTableProps {
   lwResults:     Record<Category, number>;
   forecast:      ForecastMap;
   onForecast:    (cat: Category, v: number) => void;
+  isEditing:     boolean;
   isDirty:       boolean;
   saving:        boolean;
   saveOk:        boolean;
+  onEdit:        () => void;
   onSubmit:      () => void;
-  onDiscard:     () => void;
+  onCancel:      () => void;
   updatedAt?:    string;
 }
 
 function PipelineTable({
   resultLabel, forecastLabel,
   results, lwResults, forecast, onForecast,
-  isDirty, saving, saveOk, onSubmit, onDiscard, updatedAt,
+  isEditing, isDirty, saving, saveOk, onEdit, onSubmit, onCancel, updatedAt,
 }: PipelineTableProps) {
   const total    = CATEGORIES.reduce((s, c) => s + results[c], 0);
   const lwTotal  = CATEGORIES.reduce((s, c) => s + lwResults[c], 0);
@@ -281,13 +290,16 @@ function PipelineTable({
             </tr>
 
             {/* Forecast */}
-            <tr className="bg-white border-t border-gray-100">
+            <tr className={`border-t border-gray-100 ${isEditing ? 'bg-white' : 'bg-gray-50/40'}`}>
               <td className="px-5 py-3 font-semibold text-slate-700">
                 Full <span className="underline decoration-gray-400">{forecastLabel}</span> Forecast
               </td>
               {CATEGORIES.map(cat => (
                 <td key={cat} className="px-4 py-2.5 text-right">
-                  <KInput value={forecast[cat]} onChange={v => onForecast(cat, v)} />
+                  {isEditing
+                    ? <KInput value={forecast[cat]} onChange={v => onForecast(cat, v)} />
+                    : <span className="text-sm font-medium text-slate-700 tabular-nums">{fmtK(forecast[cat])}</span>
+                  }
                 </td>
               ))}
               <td className="px-4 py-3 text-right font-semibold text-slate-700 tabular-nums">{fmtK(frcTotal)}</td>
@@ -324,33 +336,41 @@ function PipelineTable({
               <td colSpan={colSpan} className="px-5 py-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-400">
-                    {updatedAt
-                      ? `Last saved to Sheets: ${new Date(updatedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-                      : 'Not yet saved to Sheets'}
+                    {saveOk
+                      ? <span className="text-emerald-600 font-medium">Saved to Sheets ✓</span>
+                      : updatedAt
+                        ? `Last saved: ${new Date(updatedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                        : 'Not yet saved to Sheets'}
                   </span>
                   <div className="flex items-center gap-3">
-                    {saveOk && (
-                      <span className="text-emerald-600 text-sm font-medium">Saved to Sheets ✓</span>
-                    )}
-                    {isDirty && !saving && (
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={onCancel}
+                          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={onSubmit}
+                          disabled={!isDirty || saving}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            isDirty && !saving
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          {saving ? 'Saving…' : 'Save to Sheets'}
+                        </button>
+                      </>
+                    ) : (
                       <button
-                        onClick={onDiscard}
-                        className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                        onClick={onEdit}
+                        className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-slate-700 hover:bg-gray-50 transition-colors"
                       >
-                        Discard
+                        Edit
                       </button>
                     )}
-                    <button
-                      onClick={onSubmit}
-                      disabled={!isDirty || saving}
-                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        isDirty && !saving
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      {saving ? 'Saving…' : 'Save to Sheets'}
-                    </button>
                   </div>
                 </div>
               </td>
@@ -440,11 +460,13 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
           lwResults={sumByCategory(mtdLwDeals)}
           forecast={mth.draft}
           onForecast={mth.update}
+          isEditing={mth.isEditing}
           isDirty={mth.isDirty}
           saving={mth.saving}
           saveOk={mth.saveOk}
+          onEdit={mth.startEdit}
           onSubmit={() => mth.submit(mthPrefix)}
-          onDiscard={mth.discard}
+          onCancel={mth.cancel}
           updatedAt={mthEntry?.updatedAt}
         />
       </div>
@@ -473,11 +495,13 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
           lwResults={sumByCategory(qtdLwDeals)}
           forecast={qtr.draft}
           onForecast={qtr.update}
+          isEditing={qtr.isEditing}
           isDirty={qtr.isDirty}
           saving={qtr.saving}
           saveOk={qtr.saveOk}
+          onEdit={qtr.startEdit}
           onSubmit={() => qtr.submit(qtrKey)}
-          onDiscard={qtr.discard}
+          onCancel={qtr.cancel}
           updatedAt={qtrEntry?.updatedAt}
         />
       </div>
