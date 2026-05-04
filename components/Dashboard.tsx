@@ -87,7 +87,6 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
   const isCustom  = !isMonth && !isQuarter && !isYear;
 
   const fetchTime = new Date(fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const weekLabel = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const presetBtn = (label: string, active: boolean, onClick: () => void) => (
     <button
@@ -104,9 +103,10 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
     <div className="min-h-screen bg-gray-50">
       <header className="bg-slate-900 text-white shadow-lg">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center gap-4">
-          <div className="flex-1">
+          <div className="flex-1 flex items-center gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/busuu-logo.png" alt="Busuu" className="h-8 w-auto" />
             <h1 className="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
-            <p className="text-slate-400 text-sm mt-0.5">Week of {weekLabel}</p>
           </div>
 
           {/* Quick presets */}
