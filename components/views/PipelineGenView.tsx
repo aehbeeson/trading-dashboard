@@ -127,12 +127,13 @@ function mapEqual(a: ForecastMap, b: ForecastMap): boolean {
 }
 
 function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEntry | null) {
-  const [draft,     setDraft]     = useState<ForecastMap>(EMPTY_FORECAST);
-  const [saved,     setSaved]     = useState<ForecastMap>(EMPTY_FORECAST);
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving,    setSaving]    = useState(false);
-  const [saveOk,    setSaveOk]    = useState(false);
-  const [loaded,    setLoaded]    = useState(false);
+  const [draft,      setDraft]      = useState<ForecastMap>(EMPTY_FORECAST);
+  const [saved,      setSaved]      = useState<ForecastMap>(EMPTY_FORECAST);
+  const [isEditing,  setIsEditing]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [saveOk,     setSaveOk]     = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | undefined>(undefined);
+  const [loaded,     setLoaded]     = useState(false);
 
   useEffect(() => {
     const fromServer = serverEntry ? entryToMap(serverEntry) : null;
@@ -152,6 +153,7 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
 
     setDraft(draftState);
     setSaved(sheetsState);
+    setLastSavedAt(serverEntry?.updatedAt);
 
     // Only start in edit mode if there is genuinely nothing to display yet
     const hasValues = CATEGORIES.some(c => draftState[c] > 0);
@@ -194,6 +196,7 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
       const json = await res.json();
       if (json.ok) {
         setSaved(draft);
+        setLastSavedAt(new Date().toISOString());
         setSaveOk(true);
         setIsEditing(false);
         setTimeout(() => setSaveOk(false), 3000);
@@ -203,7 +206,7 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
     }
   }
 
-  return { draft, update, isDirty, isEditing, startEdit, cancel, saving, saveOk, submit, loaded };
+  return { draft, update, isDirty, isEditing, startEdit, cancel, saving, saveOk, lastSavedAt, submit, loaded };
 }
 
 // ─── £k input ────────────────────────────────────────────────────────────────
@@ -476,7 +479,7 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
           onEdit={mth.startEdit}
           onSubmit={() => mth.submit(mthPrefix)}
           onCancel={mth.cancel}
-          updatedAt={mthEntry?.updatedAt}
+          updatedAt={mth.lastSavedAt}
         />
       </div>
 
@@ -511,7 +514,7 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
           onEdit={qtr.startEdit}
           onSubmit={() => qtr.submit(qtrKey)}
           onCancel={qtr.cancel}
-          updatedAt={qtrEntry?.updatedAt}
+          updatedAt={qtr.lastSavedAt}
         />
       </div>
 
