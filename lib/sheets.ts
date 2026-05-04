@@ -7,13 +7,10 @@ export interface SheetData {
   fetchedAt: string;
 }
 
-export async function fetchDashboardData(): Promise<SheetData> {
-  const url = process.env.APPS_SCRIPT_URL;
-  if (!url) {
-    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, fetchedAt: new Date().toISOString() };
-  }
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwchrLZsUlIAHCVm7bV3orxCXHzxnodFeoDl3svh4jQNUFje6bz2KwtuySdV0mgVKl0Lg/exec';
 
-  const res = await fetch(`${url}?format=json`, {
+export async function fetchDashboardData(): Promise<SheetData> {
+  const res = await fetch(`${APPS_SCRIPT_URL}?format=json`, {
     next: { revalidate: 300 },
     redirect: 'follow',
   });
