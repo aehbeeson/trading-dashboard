@@ -18,12 +18,21 @@ function doGet(e) {
 
 function getDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Read "Downloaded dd/mm/yyyy" from A1 of Clean Data
+  var dataDownloadedAt = '';
+  var cleanSheet = ss.getSheetByName('Clean Data');
+  if (cleanSheet) {
+    dataDownloadedAt = String(cleanSheet.getRange('A1').getValue() || '').trim();
+  }
+
   var result = {
     thisWeek:            readTab(ss, 'Clean Data'),
     lastWeek:            readTab(ss, 'Clean Data Last Week'),
     sdForecasts:         readSDForecast(ss),
     pipelineGen:         readPipelineGen(ss, 'Clean Data'),
     pipelineGenLastWeek: readPipelineGen(ss, 'Clean Data Last Week'),
+    dataDownloadedAt:    dataDownloadedAt,
     fetchedAt:           new Date().toISOString()
   };
   Logger.log('thisWeek count: ' + result.thisWeek.length);

@@ -11,6 +11,7 @@ interface DashboardProps {
   sdForecasts:         SDForecastEntry[];
   pipelineGen:         PipelineGenDeal[];
   pipelineGenLastWeek: PipelineGenDeal[];
+  dataDownloadedAt:    string;
   fetchedAt:           string;
 }
 
@@ -54,7 +55,7 @@ function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
 
 const [defaultFrom, defaultTo] = monthRange();
 
-export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, dataDownloadedAt, fetchedAt }: DashboardProps) {
   const [activeArea,   setActiveArea]   = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('results');
   const [filterFrom,   setFilterFrom]   = useState(defaultFrom);
@@ -132,8 +133,16 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
             />
           </div>
 
+          {dataDownloadedAt && (
+            <div className="text-right border-r border-slate-700 pr-4">
+              <p className="text-slate-500 text-xs">Data downloaded</p>
+              <p className="text-slate-300 text-sm font-medium">
+                {dataDownloadedAt.replace(/^downloaded\s+/i, '')}
+              </p>
+            </div>
+          )}
           <div className="text-right">
-            <p className="text-slate-500 text-xs">Last updated</p>
+            <p className="text-slate-500 text-xs">Page fetched</p>
             <p className="text-slate-300 text-sm font-medium">{fetchTime}</p>
           </div>
         </div>

@@ -9,6 +9,7 @@ export interface SheetData {
   sdForecasts:         SDForecastEntry[];
   pipelineGen:         PipelineGenDeal[];
   pipelineGenLastWeek: PipelineGenDeal[];
+  dataDownloadedAt:    string;
   fetchedAt:           string;
 }
 
@@ -33,10 +34,11 @@ export async function fetchDashboardData(): Promise<SheetData> {
       sdForecasts:         data.sdForecasts         ?? [],
       pipelineGen:         data.pipelineGen         ?? [],
       pipelineGenLastWeek: data.pipelineGenLastWeek ?? [],
+      dataDownloadedAt:    data.dataDownloadedAt    ?? '',
       fetchedAt:           data.fetchedAt           ?? new Date().toISOString(),
     };
   } catch (err) {
     console.error('fetchDashboardData failed, using mock data:', err);
-    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], fetchedAt: new Date().toISOString() };
+    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], dataDownloadedAt: '', fetchedAt: new Date().toISOString() };
   }
 }
