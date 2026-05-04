@@ -195,6 +195,7 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
             thisWeek={filteredThisWeek.filter(d => d.area === activeArea)}
             lastWeek={filteredLastWeek.filter(d => d.area === activeArea)}
             allLastWeek={lastWeek.filter(d => d.area === activeArea)}
+            allThisWeek={thisWeek.filter(d => d.area === activeArea)}
           />
         )}
       </main>

@@ -11,9 +11,10 @@ interface AreaPageProps {
   thisWeek: Deal[];
   lastWeek: Deal[];
   allLastWeek: Deal[];
+  allThisWeek: Deal[];
 }
 
-export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek }: AreaPageProps) {
+export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek, allThisWeek }: AreaPageProps) {
   const config = AREAS.find(a => a.key === area)!;
 
   return (
@@ -24,7 +25,7 @@ export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek
       </div>
 
       {subTab === 'results'  && <ResultsView  deals={thisWeek} accentColor={config.accentColor} />}
-      {subTab === 'forecast' && <ForecastView deals={thisWeek} accentColor={config.accentColor} />}
+      {subTab === 'forecast' && <ForecastView deals={allThisWeek} area={area} accentColor={config.accentColor} />}
       {subTab === 'wow'      && <WoWView      thisWeek={thisWeek} lastWeek={lastWeek} allLastWeek={allLastWeek} accentColor={config.accentColor} />}
     </div>
   );
