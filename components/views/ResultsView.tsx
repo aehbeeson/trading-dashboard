@@ -55,10 +55,7 @@ function Section({ title, deals, totalARR, headerBg, headerText, defaultOpen }: 
               <span className={`font-semibold text-sm ${headerText}`}>{title}</span>
               <span className={`text-xs opacity-60 ${headerText}`}>{deals.length} deal{deals.length !== 1 ? 's' : ''}</span>
             </div>
-            <div className="flex items-center gap-4">
-              <span className={`font-bold text-sm ${headerText}`}>{fmt(totalARR)}</span>
-              <span className={`text-xs opacity-50 ${headerText}`}>{open ? '▴' : '▾'}</span>
-            </div>
+            <span className={`text-xs opacity-50 ${headerText}`}>{open ? '▴' : '▾'}</span>
           </div>
         </td>
       </tr>
@@ -85,11 +82,6 @@ function Section({ title, deals, totalARR, headerBg, headerText, defaultOpen }: 
                   <td className="px-5 py-2.5 text-gray-500">{fmtDate(deal.closeDate)}</td>
                 </tr>
               ))}
-              <tr className="bg-gray-50 border-t border-gray-200 font-semibold text-slate-700">
-                <td colSpan={4} className="px-5 py-2 text-xs uppercase tracking-wide text-gray-400">Subtotal</td>
-                <td className="px-5 py-2 text-right">{fmt(totalARR)}</td>
-                <td />
-              </tr>
             </>
           )}
         </>
