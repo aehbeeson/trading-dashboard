@@ -4,6 +4,7 @@ import { Deal, AreaKey, SubTabKey, AREAS, SDForecastEntry } from '@/lib/types';
 import ResultsView from './views/ResultsView';
 import ForecastView from './views/ForecastView';
 import WoWView from './views/WoWView';
+import PriorPeriodView from './views/PriorPeriodView';
 
 interface AreaPageProps {
   area: AreaKey;
@@ -25,9 +26,10 @@ export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek
         <h2 className="text-xl font-bold text-slate-900">{config.label}</h2>
       </div>
 
-      {subTab === 'results'  && <ResultsView  deals={thisWeek} accentColor={config.accentColor} />}
-      {subTab === 'forecast' && <ForecastView deals={allThisWeek} area={area} accentColor={config.accentColor} serverForecast={sdForecast} />}
-      {subTab === 'wow'      && <WoWView      thisWeek={thisWeek} lastWeek={lastWeek} allLastWeek={allLastWeek} accentColor={config.accentColor} />}
+      {subTab === 'results'  && <ResultsView      deals={thisWeek} accentColor={config.accentColor} />}
+      {subTab === 'forecast' && <ForecastView     deals={allThisWeek} area={area} accentColor={config.accentColor} serverForecast={sdForecast} />}
+      {subTab === 'wow'      && <WoWView          thisWeek={thisWeek} lastWeek={lastWeek} allLastWeek={allLastWeek} accentColor={config.accentColor} />}
+      {subTab === 'prior'    && <PriorPeriodView  deals={allThisWeek} accentColor={config.accentColor} />}
     </div>
   );
 }

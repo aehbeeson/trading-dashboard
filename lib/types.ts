@@ -16,7 +16,7 @@ export interface SDForecastEntry {
   otherDeals: string;
   updatedAt:  string;
 }
-export type SubTabKey = 'results' | 'forecast' | 'wow';
+export type SubTabKey = 'results' | 'forecast' | 'wow' | 'prior';
 export type ForecastCategory = 'Commit' | 'Best Case' | 'Pipeline' | 'Omitted';
 
 export interface Deal {
@@ -29,6 +29,7 @@ export interface Deal {
   closeDate: string;
   area: AreaKey;
   probability: number; // 0–1, where 1 = Closed Won, 0 = Closed Lost
+  closeWeekNo?: string; // e.g. "5 2024"
 }
 
 export interface AreaConfig {
@@ -50,4 +51,5 @@ export const SUB_TABS: { key: SubTabKey; label: string }[] = [
   { key: 'results',  label: 'Results'              },
   { key: 'forecast', label: 'SD Forecast'          },
   { key: 'wow',      label: 'WoW Changes'          },
+  { key: 'prior',    label: 'Prior Period Results' },
 ];

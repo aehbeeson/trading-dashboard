@@ -162,6 +162,7 @@ function readTab(ss, tabName) {
     NB_SPLIT:       findCol(H, ['NB Split'],                                                     42),
     CS_SPLIT:       findCol(H, ['CS Split'],                                                     43),
     PROBABILITY:    findCol(H, ['Probability (%)', 'Deal probability', 'Probability'],           -1),
+    CLOSE_WEEK_NO:  findCol(H, ['Close Week No', 'Close Week Number', 'Week No'],                30),
   };
   Logger.log(tabName + ' resolved columns: ' + JSON.stringify(C));
 
@@ -216,7 +217,9 @@ function readTab(ss, tabName) {
       if (prob > 1) prob = prob / 100; // normalize percentage (0-100) to decimal (0-1)
     }
 
-    var base = { company: company, owner: owner, stage: stage, forecastCategory: forecastCategory, closeDate: closeDate, probability: prob };
+    var closeWeekNo = C.CLOSE_WEEK_NO >= 0 ? String(row[C.CLOSE_WEEK_NO] || '').trim() : '';
+
+    var base = { company: company, owner: owner, stage: stage, forecastCategory: forecastCategory, closeDate: closeDate, probability: prob, closeWeekNo: closeWeekNo };
 
     if (pipeline === 'Resellers') {
       // Resellers: NB Split holds the reseller value (falls back to full Amount)
