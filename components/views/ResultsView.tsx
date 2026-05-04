@@ -11,7 +11,7 @@ const FORECAST_BADGE: Record<ForecastCategory, string> = {
 };
 
 function fmt(v: number) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v);
+  return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 }
 
 function fmtDate(str: string) {

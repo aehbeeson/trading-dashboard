@@ -27,7 +27,7 @@ function filterByDate(deals: Deal[], from: string, to: string) {
   });
 }
 function fmtK(v: number) {
-  return v === 0 ? '—' : '£' + Math.round(v / 1000) + 'k';
+  return v === 0 ? '—' : '€' + Math.round(v / 1000) + 'k';
 }
 
 // ─── Pipeline calculation ────────────────────────────────────────────────────

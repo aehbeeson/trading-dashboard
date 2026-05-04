@@ -8,10 +8,10 @@ import { Deal, AreaKey, AREAS, SDForecastEntry, OverviewComment } from '@/lib/ty
 function fmtK(v: number) {
   if (v === 0) return '—';
   const abs = Math.abs(v);
-  return (v < 0 ? '-' : '') + '£' + (abs >= 1_000_000 ? (abs / 1_000_000).toFixed(1) + 'M' : Math.round(abs / 1000) + 'k');
+  return (v < 0 ? '-' : '') + '€' + (abs >= 1_000_000 ? (abs / 1_000_000).toFixed(1) + 'M' : Math.round(abs / 1000) + 'k');
 }
 function fmtFull(v: number) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v);
+  return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 }
 function fmtPct(v: number) {
   return (v >= 0 ? '+' : '') + Math.round(v) + '%';
@@ -46,12 +46,21 @@ function closedWon(deals: Deal[]): number {
 function DeltaCell({ delta, base }: { delta: number | null; base: number | null }) {
   if (delta === null || base === null) return <span className="text-gray-300 text-xs">—</span>;
   if (delta === 0 && base === 0) return <span className="text-gray-400 text-xs">—</span>;
-  const color = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-red-500' : 'text-gray-400';
-  const pct   = base !== 0 ? (delta / Math.abs(base)) * 100 : null;
+  const color    = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-red-500' : 'text-gray-400';
+  const pct      = base !== 0 ? (delta / Math.abs(base)) * 100 : null;
+  const bubbleCls = delta > 0
+    ? 'bg-emerald-100 text-emerald-700'
+    : delta < 0
+    ? 'bg-red-100 text-red-600'
+    : 'bg-gray-100 text-gray-500';
   return (
-    <div className={`${color} font-medium tabular-nums`}>
-      <div className="text-sm">{delta > 0 ? '+' : ''}{fmtK(delta)}</div>
-      {pct !== null && <div className="text-xs opacity-70">{fmtPct(pct)}</div>}
+    <div className={`${color} font-medium tabular-nums flex items-center justify-end gap-1.5`}>
+      <span className="text-sm">{delta > 0 ? '+' : ''}{fmtK(delta)}</span>
+      {pct !== null && (
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${bubbleCls}`}>
+          {fmtPct(pct)}
+        </span>
+      )}
     </div>
   );
 }

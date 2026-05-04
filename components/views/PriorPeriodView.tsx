@@ -8,10 +8,10 @@ import { Deal } from '@/lib/types';
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function fmtFull(v: number) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v);
+  return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 }
 function fmtK(v: number) {
-  return v === 0 ? '—' : '£' + Math.round(v / 1000) + 'k';
+  return v === 0 ? '—' : '€' + Math.round(v / 1000) + 'k';
 }
 function fmtDate(s: string) {
   if (!s) return '—';

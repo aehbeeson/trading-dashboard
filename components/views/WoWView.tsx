@@ -8,7 +8,7 @@ const FC_ORDER: Record<string, number> = {
 };
 
 function fmtK(v: number): string {
-  return '£' + Math.round(v / 1000) + 'k';
+  return '€' + Math.round(v / 1000) + 'k';
 }
 
 function fmtDelta(delta: number): string {
@@ -24,7 +24,7 @@ function fmtDate(str: string): string {
 }
 
 function fmt(v: number) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v);
+  return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 }
 
 interface WoWViewProps {

@@ -20,7 +20,7 @@ const SOURCE_MAP: Record<string, Category> = {
 function fmtK(v: number) {
   if (v === 0) return '—';
   const abs = Math.abs(v);
-  return (v < 0 ? '-' : '') + '£' + (abs >= 1_000_000 ? (abs / 1_000_000).toFixed(1) + 'M' : Math.round(abs / 1000) + 'k');
+  return (v < 0 ? '-' : '') + '€' + (abs >= 1_000_000 ? (abs / 1_000_000).toFixed(1) + 'M' : Math.round(abs / 1000) + 'k');
 }
 
 function fmtPct(actual: number, target: number) {
