@@ -27,6 +27,12 @@ export interface PipelineGenForecastEntry {
   updatedAt:    string;
 }
 
+export interface OverviewComment {
+  period:    string;  // "2026-05" (month) or "2026-Q2" (quarter)
+  comment:   string;
+  updatedAt: string;
+}
+
 export interface PipelineGenDeal {
   id:         string;
   company:    string;

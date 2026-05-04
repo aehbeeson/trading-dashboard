@@ -6,6 +6,9 @@ function doGet(e) {
     if (e.parameter.action === 'savePipelineGenForecast') {
       return handleSavePipelineGenForecast(e.parameter.data);
     }
+    if (e.parameter.action === 'saveOverviewComment') {
+      return handleSaveOverviewComment(e.parameter.data);
+    }
     if (e.parameter.format === 'json') {
       var data = getDashboardData();
       return ContentService
@@ -37,11 +40,63 @@ function getDashboardData() {
     pipelineGenLastWeek: readPipelineGen(ss, 'Clean Data Last Week'),
     dataDownloadedAt:      dataDownloadedAt,
     pipelineGenForecasts:  readPipelineGenForecast(ss),
+    overviewComments:      readOverviewComments(ss),
     fetchedAt:             new Date().toISOString()
   };
   Logger.log('thisWeek count: ' + result.thisWeek.length);
   Logger.log('lastWeek count: ' + result.lastWeek.length);
   if (result.thisWeek.length > 0) Logger.log('First deal: ' + JSON.stringify(result.thisWeek[0]));
+  return result;
+}
+
+// ── Overview Comments sheet ──────────────────────────────────────────────────
+
+function getOrCreateOverviewCommentsSheet(ss) {
+  var sheet = ss.getSheetByName('Overview Comments');
+  if (!sheet) {
+    sheet = ss.insertSheet('Overview Comments');
+    sheet.getRange(1, 1, 1, 3).setValues([['SubmittedAt', 'Period', 'Comment']]);
+  }
+  return sheet;
+}
+
+function handleSaveOverviewComment(encodedData) {
+  try {
+    var data  = JSON.parse(decodeURIComponent(encodedData));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = getOrCreateOverviewCommentsSheet(ss);
+    sheet.appendRow([
+      new Date().toISOString(),
+      String(data.period  || '').trim(),
+      String(data.comment || '').trim(),
+    ]);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function readOverviewComments(ss) {
+  var sheet = ss.getSheetByName('Overview Comments');
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return [];
+  var latest = {};
+  for (var i = 1; i < rows.length; i++) {
+    var r      = rows[i];
+    var period = String(r[1] || '').trim();
+    if (!period) continue;
+    latest[period] = r;
+  }
+  var result = [];
+  for (var key in latest) {
+    var r = latest[key];
+    result.push({ period: key, comment: String(r[2] || ''), updatedAt: String(r[0] || '') });
+  }
   return result;
 }
 
