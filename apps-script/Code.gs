@@ -1,4 +1,10 @@
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.format === 'json') {
+    var data = getDashboardData();
+    return ContentService
+      .createTextOutput(JSON.stringify(data))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return HtmlService
     .createHtmlOutputFromFile('Index')
     .setTitle('B2B Trading Dashboard')
