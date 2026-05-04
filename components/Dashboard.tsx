@@ -103,9 +103,9 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
     <div className="min-h-screen bg-gray-50">
       <header className="bg-slate-900 text-white shadow-lg">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center gap-4">
-          <div className="flex-1 flex items-center gap-4">
+          <div className="flex-1 flex flex-col gap-1 pt-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/busuu-logo.png" alt="Busuu" className="h-8 w-auto" />
+            <img src="/busuu-logo.png" alt="Busuu" className="h-8 w-auto self-start" />
             <h1 className="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
           </div>
 
