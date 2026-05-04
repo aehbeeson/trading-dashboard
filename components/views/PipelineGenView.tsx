@@ -443,7 +443,8 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
             No data for the current month yet — showing <strong>{monthLabel}</strong> (most recent available).
           </div>
         )}
-        <div className="flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <ThroughBadge pct={mtdThrough} unit="month" />
           <div>
             <h2 className="text-lg font-bold text-slate-800">
               {isMthCurrent ? 'MTD ' : ''}Pipeline Generation
@@ -452,7 +453,6 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
               {monthLabel} · New Business · grouped by deal create date &amp; source type
             </p>
           </div>
-          <ThroughBadge pct={mtdThrough} unit="month" />
         </div>
         <PipelineTable
           resultLabel="MTD" forecastLabel="Month"
@@ -478,7 +478,8 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
             No data for the current quarter yet — showing <strong>{quarterLabel}</strong> (most recent available).
           </div>
         )}
-        <div className="flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <ThroughBadge pct={qtrThrough} unit="quarter" />
           <div>
             <h2 className="text-lg font-bold text-slate-800">
               {qtrInfo.isCurrent ? 'QTD ' : ''}Pipeline Generation
@@ -487,7 +488,6 @@ export default function PipelineGenView({ pipelineGen, pipelineGenLastWeek, pipe
               {quarterLabel} · New Business · grouped by deal create date &amp; source type
             </p>
           </div>
-          <ThroughBadge pct={qtrThrough} unit="quarter" />
         </div>
         <PipelineTable
           resultLabel="QTD" forecastLabel="Quarter"
