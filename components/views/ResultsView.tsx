@@ -166,7 +166,15 @@ export default function ResultsView({ deals }: ResultsViewProps) {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col />
+              <col style={{ width: '220px' }} />
+              <col style={{ width: '220px' }} />
+              <col style={{ width: '220px' }} />
+              <col style={{ width: '220px' }} />
+              <col style={{ width: '220px' }} />
+            </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white text-xs uppercase tracking-wide">
                 <th className="px-5 py-2.5 text-left font-semibold">Company</th>
