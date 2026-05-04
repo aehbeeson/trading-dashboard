@@ -1,6 +1,6 @@
 'use client';
 
-import { Deal, AreaKey, SubTabKey, AREAS } from '@/lib/types';
+import { Deal, AreaKey, SubTabKey, AREAS, SDForecastEntry } from '@/lib/types';
 import ResultsView from './views/ResultsView';
 import ForecastView from './views/ForecastView';
 import WoWView from './views/WoWView';
@@ -12,9 +12,10 @@ interface AreaPageProps {
   lastWeek: Deal[];
   allLastWeek: Deal[];
   allThisWeek: Deal[];
+  sdForecast: SDForecastEntry | null;
 }
 
-export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek, allThisWeek }: AreaPageProps) {
+export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek, allThisWeek, sdForecast }: AreaPageProps) {
   const config = AREAS.find(a => a.key === area)!;
 
   return (
@@ -25,7 +26,7 @@ export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek
       </div>
 
       {subTab === 'results'  && <ResultsView  deals={thisWeek} accentColor={config.accentColor} />}
-      {subTab === 'forecast' && <ForecastView deals={allThisWeek} area={area} accentColor={config.accentColor} />}
+      {subTab === 'forecast' && <ForecastView deals={allThisWeek} area={area} accentColor={config.accentColor} serverForecast={sdForecast} />}
       {subTab === 'wow'      && <WoWView      thisWeek={thisWeek} lastWeek={lastWeek} allLastWeek={allLastWeek} accentColor={config.accentColor} />}
     </div>
   );

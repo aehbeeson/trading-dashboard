@@ -1,9 +1,14 @@
 function doGet(e) {
-  if (e && e.parameter && e.parameter.format === 'json') {
-    var data = getDashboardData();
-    return ContentService
-      .createTextOutput(JSON.stringify(data))
-      .setMimeType(ContentService.MimeType.JSON);
+  if (e && e.parameter) {
+    if (e.parameter.action === 'saveForecast') {
+      return handleSaveForecast(e.parameter.data);
+    }
+    if (e.parameter.format === 'json') {
+      var data = getDashboardData();
+      return ContentService
+        .createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
   }
   return HtmlService
     .createHtmlOutputFromFile('Index')
@@ -14,15 +19,106 @@ function doGet(e) {
 function getDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var result = {
-    thisWeek:  readTab(ss, 'Clean Data'),
-    lastWeek:  readTab(ss, 'Clean Data Last Week'),
-    fetchedAt: new Date().toISOString()
+    thisWeek:    readTab(ss, 'Clean Data'),
+    lastWeek:    readTab(ss, 'Clean Data Last Week'),
+    sdForecasts: readSDForecast(ss),
+    fetchedAt:   new Date().toISOString()
   };
   Logger.log('thisWeek count: ' + result.thisWeek.length);
   Logger.log('lastWeek count: ' + result.lastWeek.length);
   if (result.thisWeek.length > 0) Logger.log('First deal: ' + JSON.stringify(result.thisWeek[0]));
   return result;
 }
+
+// ── SD Forecast sheet ────────────────────────────────────────────────────────
+
+function getOrCreateForecastSheet(ss) {
+  var sheet = ss.getSheetByName('SD Forecast');
+  if (!sheet) {
+    sheet = ss.insertSheet('SD Forecast');
+    sheet.getRange(1, 1, 1, 14).setValues([[
+      'Area',
+      'Month_ClosedWon', 'Month_Commit', 'Month_BestCase', 'Month_Pipeline', 'Month_Omitted',
+      'Qtr_ClosedWon',   'Qtr_Commit',   'Qtr_BestCase',   'Qtr_Pipeline',   'Qtr_Omitted',
+      'MainDeals', 'OtherDeals', 'UpdatedAt'
+    ]]);
+  }
+  return sheet;
+}
+
+function handleSaveForecast(encodedData) {
+  try {
+    var data = JSON.parse(decodeURIComponent(encodedData));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = getOrCreateForecastSheet(ss);
+    var all   = sheet.getDataRange().getValues();
+
+    // Find existing row for this area (skip header row 0)
+    var rowIdx = -1;
+    for (var i = 1; i < all.length; i++) {
+      if (String(all[i][0]).trim() === String(data.area).trim()) {
+        rowIdx = i + 1; // 1-indexed for setRange
+        break;
+      }
+    }
+    if (rowIdx === -1) rowIdx = all.length + 1; // append
+
+    var m = data.month   || {};
+    var q = data.quarter || {};
+    sheet.getRange(rowIdx, 1, 1, 14).setValues([[
+      data.area,
+      Number(m.closedWon) || 0, Number(m.commit) || 0, Number(m.bestCase) || 0, Number(m.pipeline) || 0, Number(m.omitted) || 0,
+      Number(q.closedWon) || 0, Number(q.commit) || 0, Number(q.bestCase) || 0, Number(q.pipeline) || 0, Number(q.omitted) || 0,
+      String(data.mainDeals  || ''),
+      String(data.otherDeals || ''),
+      new Date().toISOString()
+    ]]);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function readSDForecast(ss) {
+  var sheet = ss.getSheetByName('SD Forecast');
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return [];
+
+  var result = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    result.push({
+      area: String(r[0]).trim(),
+      month: {
+        closedWon: Number(r[1])  || 0,
+        commit:    Number(r[2])  || 0,
+        bestCase:  Number(r[3])  || 0,
+        pipeline:  Number(r[4])  || 0,
+        omitted:   Number(r[5])  || 0,
+      },
+      quarter: {
+        closedWon: Number(r[6])  || 0,
+        commit:    Number(r[7])  || 0,
+        bestCase:  Number(r[8])  || 0,
+        pipeline:  Number(r[9])  || 0,
+        omitted:   Number(r[10]) || 0,
+      },
+      mainDeals:  String(r[11] || ''),
+      otherDeals: String(r[12] || ''),
+      updatedAt:  String(r[13] || ''),
+    });
+  }
+  return result;
+}
+
+// ── Column helpers ───────────────────────────────────────────────────────────
 
 // Case-insensitive column finder — returns defaultIdx if no header matches
 function findCol(H, candidates, defaultIdx) {

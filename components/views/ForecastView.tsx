@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Deal, AreaKey } from '@/lib/types';
+import { useState, useEffect, useRef } from 'react';
+import { Deal, AreaKey, SDForecastEntry, PeriodForecast } from '@/lib/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ function calcPipeline(deals: Deal[]): PipelineCalc {
 
 // ─── SD Forecast state ───────────────────────────────────────────────────────
 
-type PeriodForecast = Record<RowKey, number>;
+const EMPTY_PERIOD: PeriodForecast = { closedWon: 0, commit: 0, bestCase: 0, pipeline: 0, omitted: 0 };
 
 interface SDForecast {
   month:      PeriodForecast;
@@ -69,8 +69,6 @@ interface SDForecast {
   mainDeals:  string;
   otherDeals: string;
 }
-
-const EMPTY_PERIOD: PeriodForecast = { closedWon: 0, commit: 0, bestCase: 0, pipeline: 0, omitted: 0 };
 
 const EMPTY_FORECAST: SDForecast = {
   month:      { ...EMPTY_PERIOD },
@@ -123,23 +121,57 @@ interface ForecastViewProps {
   deals: Deal[];      // all this-week deals for this area, unfiltered by global date
   area: AreaKey;
   accentColor: string;
+  serverForecast: SDForecastEntry | null;
 }
 
-export default function ForecastView({ deals, area }: ForecastViewProps) {
-  const [sd, setSd]       = useState<SDForecast>(EMPTY_FORECAST);
-  const [loaded, setLoaded] = useState(false);
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
+export default function ForecastView({ deals, area, serverForecast }: ForecastViewProps) {
+  const [sd, setSd]         = useState<SDForecast>(EMPTY_FORECAST);
+  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<SaveStatus>('idle');
+  const saveTimer           = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Initialise: prefer server data, fall back to localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`sdForecast_${area}`);
-      if (raw) setSd(JSON.parse(raw));
-    } catch {}
+    if (serverForecast) {
+      setSd({
+        month:      serverForecast.month,
+        quarter:    serverForecast.quarter,
+        mainDeals:  serverForecast.mainDeals,
+        otherDeals: serverForecast.otherDeals,
+      });
+    } else {
+      try {
+        const raw = localStorage.getItem(`sdForecast_${area}`);
+        if (raw) setSd(JSON.parse(raw));
+      } catch {}
+    }
     setLoaded(true);
-  }, [area]);
+  }, [area, serverForecast]);
 
   function save(next: SDForecast) {
     setSd(next);
+    // Persist to localStorage immediately for instant local cache
     try { localStorage.setItem(`sdForecast_${area}`, JSON.stringify(next)); } catch {}
+
+    // Debounce the server write by 800ms so rapid typing doesn't flood the API
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setStatus('saving');
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/forecast', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ area, ...next }),
+        });
+        const json = await res.json();
+        setStatus(json.ok ? 'saved' : 'error');
+      } catch {
+        setStatus('error');
+      }
+      setTimeout(() => setStatus('idle'), 3000);
+    }, 800);
   }
 
   function setSDValue(period: 'month' | 'quarter', key: RowKey, value: number) {
@@ -270,9 +302,16 @@ export default function ForecastView({ deals, area }: ForecastViewProps) {
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-gray-400 text-right">
-        SD Forecast values and comments are saved locally in your browser.
-      </p>
+      <div className="mt-3 flex justify-end items-center gap-2 text-xs">
+        {status === 'saving' && <span className="text-gray-400">Saving to Google Sheets…</span>}
+        {status === 'saved'  && <span className="text-emerald-600">Saved to Google Sheets</span>}
+        {status === 'error'  && <span className="text-red-500">Save failed — changes kept locally</span>}
+        {serverForecast?.updatedAt && status === 'idle' && (
+          <span className="text-gray-400">
+            Last saved {new Date(serverForecast.updatedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

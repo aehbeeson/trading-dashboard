@@ -1,4 +1,21 @@
 export type AreaKey = 'new-business' | 'customer-success' | 'resellers' | 'guild';
+
+export interface PeriodForecast {
+  closedWon: number;
+  commit:    number;
+  bestCase:  number;
+  pipeline:  number;
+  omitted:   number;
+}
+
+export interface SDForecastEntry {
+  area:       string;
+  month:      PeriodForecast;
+  quarter:    PeriodForecast;
+  mainDeals:  string;
+  otherDeals: string;
+  updatedAt:  string;
+}
 export type SubTabKey = 'results' | 'forecast' | 'wow';
 export type ForecastCategory = 'Commit' | 'Best Case' | 'Pipeline' | 'Omitted';
 

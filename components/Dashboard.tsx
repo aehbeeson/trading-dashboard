@@ -1,14 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS } from '@/lib/types';
+import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, SDForecastEntry } from '@/lib/types';
 import SummaryPage from './SummaryPage';
 import AreaPage from './AreaPage';
 
 interface DashboardProps {
-  thisWeek: Deal[];
-  lastWeek: Deal[];
-  fetchedAt: string;
+  thisWeek:    Deal[];
+  lastWeek:    Deal[];
+  sdForecasts: SDForecastEntry[];
+  fetchedAt:   string;
 }
 
 // Build YYYY-MM-DD from local date components to avoid UTC timezone shifts
@@ -51,7 +52,7 @@ function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
 
 const [defaultFrom, defaultTo] = monthRange();
 
-export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, fetchedAt }: DashboardProps) {
   const [activeArea,   setActiveArea]   = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('results');
   const [filterFrom,   setFilterFrom]   = useState(defaultFrom);
@@ -196,6 +197,7 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
             lastWeek={filteredLastWeek.filter(d => d.area === activeArea)}
             allLastWeek={lastWeek.filter(d => d.area === activeArea)}
             allThisWeek={thisWeek.filter(d => d.area === activeArea)}
+            sdForecast={sdForecasts.find(f => f.area === activeArea) ?? null}
           />
         )}
       </main>
