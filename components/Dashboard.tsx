@@ -127,11 +127,11 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
             <h1 className="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
           </div>
 
-          {/* Quick presets with dropdowns */}
-          {openDropdown && (
+          {/* Quick presets + date inputs — hidden on Overview */}
+          {activeArea !== 'summary' && openDropdown && (
             <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
           )}
-          <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1 relative z-20">
+          {activeArea !== 'summary' && <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1 relative z-20">
             {(
               [
                 { key: 'month'   as const, options: monthOptions,   active: activeMonth   },
@@ -172,24 +172,25 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
             {isCustom && (
               <span className="px-2.5 py-1 rounded text-xs font-medium bg-white text-slate-900">Custom</span>
             )}
-          </div>
+          </div>}
 
-          {/* Date inputs */}
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={filterFrom}
-              onChange={e => setFilterFrom(e.target.value)}
-              className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
-            />
-            <span className="text-slate-500 text-xs">to</span>
-            <input
-              type="date"
-              value={filterTo}
-              onChange={e => setFilterTo(e.target.value)}
-              className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
-            />
-          </div>
+          {activeArea !== 'summary' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filterFrom}
+                onChange={e => setFilterFrom(e.target.value)}
+                className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
+              />
+              <span className="text-slate-500 text-xs">to</span>
+              <input
+                type="date"
+                value={filterTo}
+                onChange={e => setFilterTo(e.target.value)}
+                className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
+              />
+            </div>
+          )}
 
           {dataDownloadedAt && (
             <div className="text-right border-r border-slate-700 pr-4">
