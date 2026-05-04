@@ -136,19 +136,26 @@ function useSectionForecast(localKey: string, serverEntry: PipelineGenForecastEn
 
   useEffect(() => {
     const fromServer = serverEntry ? entryToMap(serverEntry) : null;
-    let initial: ForecastMap = EMPTY_FORECAST;
-    if (fromServer) {
-      initial = fromServer;
-    } else {
+
+    // `saved` always reflects what is actually in Sheets (empty if not yet saved)
+    const sheetsState = fromServer ?? EMPTY_FORECAST;
+
+    // `draft` starts from Sheets, falls back to localStorage so in-progress
+    // work isn't lost between sessions
+    let draftState: ForecastMap = sheetsState;
+    if (!fromServer) {
       try {
         const raw = localStorage.getItem(localKey);
-        if (raw) initial = JSON.parse(raw);
+        if (raw) draftState = JSON.parse(raw);
       } catch {}
     }
-    setDraft(initial);
-    setSaved(initial);
-    // Start in edit mode only if there's nothing saved to Sheets yet
-    setIsEditing(!fromServer);
+
+    setDraft(draftState);
+    setSaved(sheetsState);
+
+    // Only start in edit mode if there is genuinely nothing to display yet
+    const hasValues = CATEGORIES.some(c => draftState[c] > 0);
+    setIsEditing(!hasValues);
     setLoaded(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -340,7 +347,9 @@ function PipelineTable({
                       ? <span className="text-emerald-600 font-medium">Saved to Sheets ✓</span>
                       : updatedAt
                         ? `Last saved: ${new Date(updatedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-                        : 'Not yet saved to Sheets'}
+                        : isDirty
+                          ? <span className="text-amber-600">Not yet synced to Sheets — click Edit then Save</span>
+                          : 'Not yet saved to Sheets'}
                   </span>
                   <div className="flex items-center gap-3">
                     {isEditing ? (
