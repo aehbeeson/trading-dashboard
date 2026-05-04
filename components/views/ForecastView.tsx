@@ -103,13 +103,14 @@ interface ForecastViewProps {
 }
 
 export default function ForecastView({ deals, area, accentColor, serverForecast }: ForecastViewProps) {
-  const [saved,     setSaved]     = useState<SDForecast>(EMPTY_FORECAST);
-  const [draft,     setDraft]     = useState<SDForecast>(EMPTY_FORECAST);
-  const [isDirty,   setIsDirty]   = useState(false);
-  const [isSaving,  setIsSaving]  = useState(false);
-  const [submitOk,  setSubmitOk]  = useState(false);
-  const [lastSaved, setLastSaved] = useState<string | null>(null);
-  const [loaded,    setLoaded]    = useState(false);
+  const [saved,      setSaved]      = useState<SDForecast>(EMPTY_FORECAST);
+  const [draft,      setDraft]      = useState<SDForecast>(EMPTY_FORECAST);
+  const [isDirty,    setIsDirty]    = useState(false);
+  const [isSaving,   setIsSaving]   = useState(false);
+  const [submitOk,   setSubmitOk]   = useState(false);
+  const [lastSaved,  setLastSaved]  = useState<string | null>(null);
+  const [loaded,     setLoaded]     = useState(false);
+  const [isEditing,  setIsEditing]  = useState(false);
 
   useEffect(() => {
     let initial = EMPTY_FORECAST;
@@ -139,6 +140,7 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
         setSaved(draft);
         setIsDirty(false);
         setSubmitOk(true);
+        setIsEditing(false);
         const now = new Date().toISOString();
         setLastSaved(now);
         try { localStorage.setItem(`sdForecast_${area}`, JSON.stringify(draft)); } catch {}
@@ -148,7 +150,7 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
     setIsSaving(false);
   }
 
-  function discard() { setDraft(saved); setIsDirty(false); setSubmitOk(false); }
+  function discard() { setDraft(saved); setIsDirty(false); setSubmitOk(false); setIsEditing(false); }
 
   const [mFrom, mTo] = monthRange();
   const [qFrom, qTo] = quarterRange();
@@ -182,27 +184,36 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
               Submitted to Google Sheets
             </span>
           )}
-          {isDirty && (
+          {isEditing ? (
             <>
-              <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
-                Unsaved changes
-              </span>
+              {isDirty && (
+                <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+                  Unsaved changes
+                </span>
+              )}
               <button onClick={discard} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                Discard
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!isDirty || isSaving}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  isDirty
+                    ? 'bg-slate-900 text-white hover:bg-slate-700 shadow-sm'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isSaving ? 'Submitting…' : 'Submit Forecast'}
               </button>
             </>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              Edit Forecast
+            </button>
           )}
-          <button
-            onClick={handleSubmit}
-            disabled={!isDirty || isSaving}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              isDirty
-                ? 'bg-slate-900 text-white hover:bg-slate-700 shadow-sm'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {isSaving ? 'Submitting…' : 'Submit Forecast'}
-          </button>
         </div>
       </div>
 
@@ -247,8 +258,8 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
 
                     {/* Month SD */}
                     <td className="px-4 py-2.5 text-right">
-                      {isWon
-                        ? <span className="text-emerald-700 font-medium tabular-nums">{fmtK(mCalc.closedWon)}</span>
+                      {isWon || !isEditing
+                        ? <span className={`font-medium tabular-nums ${isWon ? 'text-emerald-700' : 'text-slate-700'}`}>{fmtK(isWon ? mCalc.closedWon : draft.month[row.key])}</span>
                         : <KInput value={draft.month[row.key]} onChange={v => updateDraft({ ...draft, month: { ...draft.month, [row.key]: v } })} />
                       }
                     </td>
@@ -262,8 +273,8 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
 
                     {/* Quarter SD */}
                     <td className="px-4 py-2.5 text-right">
-                      {isWon
-                        ? <span className="text-emerald-700 font-medium tabular-nums">{fmtK(qCalc.closedWon)}</span>
+                      {isWon || !isEditing
+                        ? <span className={`font-medium tabular-nums ${isWon ? 'text-emerald-700' : 'text-slate-700'}`}>{fmtK(isWon ? qCalc.closedWon : draft.quarter[row.key])}</span>
                         : <KInput value={draft.quarter[row.key]} onChange={v => updateDraft({ ...draft, quarter: { ...draft.quarter, [row.key]: v } })} />
                       }
                     </td>
@@ -294,13 +305,19 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
         ].map(({ field, title, placeholder }) => (
           <div key={field} className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="font-semibold text-slate-800 mb-3 text-sm">{title}</h3>
-            <textarea
-              value={draft[field]}
-              onChange={e => updateDraft({ ...draft, [field]: e.target.value })}
-              placeholder={placeholder}
-              rows={7}
-              className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 text-gray-700 placeholder-gray-300 leading-relaxed"
-            />
+            {isEditing ? (
+              <textarea
+                value={draft[field]}
+                onChange={e => updateDraft({ ...draft, [field]: e.target.value })}
+                placeholder={placeholder}
+                rows={7}
+                className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 text-gray-700 placeholder-gray-300 leading-relaxed"
+              />
+            ) : (
+              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap min-h-[7rem]">
+                {draft[field] || <span className="text-gray-300 italic">No notes added</span>}
+              </p>
+            )}
           </div>
         ))}
       </div>
