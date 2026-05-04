@@ -186,7 +186,7 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
   const curY = now.getFullYear();
   const curQ = Math.ceil((now.getMonth() + 1) / 3);
 
-  const quarters = useToggleSet<string>([`${curY}-Q${curQ}`]);
+  const quarters = useToggleSet<string>([]);
   const months   = useToggleSet<string>([]);
   const weeks    = useToggleSet<string>([]);
 
