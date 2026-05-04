@@ -194,6 +194,7 @@ export default function Dashboard({ thisWeek, lastWeek, fetchedAt }: DashboardPr
             subTab={activeSubTab}
             thisWeek={filteredThisWeek.filter(d => d.area === activeArea)}
             lastWeek={filteredLastWeek.filter(d => d.area === activeArea)}
+            allLastWeek={lastWeek.filter(d => d.area === activeArea)}
           />
         )}
       </main>

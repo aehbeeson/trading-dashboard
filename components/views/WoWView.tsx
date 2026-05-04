@@ -2,44 +2,62 @@
 
 import { Deal } from '@/lib/types';
 
+const FC_ORDER: Record<string, number> = {
+  'Omitted': 0, 'Pipeline': 1, 'Best Case': 2, 'Commit': 3,
+};
+
+function fmtK(v: number): string {
+  return '£' + Math.round(v / 1000) + 'k';
+}
+
+function fmtDelta(delta: number): string {
+  if (delta === 0) return '-';
+  const abs = fmtK(Math.abs(delta));
+  return delta < 0 ? `(${abs})` : `+${abs}`;
+}
+
+function fmtDate(str: string): string {
+  if (!str) return '-';
+  const d = new Date(str + 'T00:00:00');
+  return isNaN(d.getTime()) ? str : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+
 function fmt(v: number) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v);
 }
 
 interface WoWViewProps {
   thisWeek: Deal[];
-  lastWeek: Deal[];
+  lastWeek: Deal[];   // date-filtered, for net movement calcs
+  allLastWeek: Deal[]; // not date-filtered, for per-deal lookups
   accentColor: string;
 }
 
-export default function WoWView({ thisWeek, lastWeek }: WoWViewProps) {
-  const twIds = new Set(thisWeek.map(d => d.id));
-  const lwIds = new Set(lastWeek.map(d => d.id));
+export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProps) {
+  const lwMap  = new Map(allLastWeek.map(d => [d.id, d]));
+  const twIds  = new Set(thisWeek.map(d => d.id));
 
-  const newDeals     = thisWeek.filter(d => !lwIds.has(d.id));
-  const removedDeals = lastWeek.filter(d => !twIds.has(d.id));
+  // Net movement using date-filtered lastWeek
+  const removedDeals  = lastWeek.filter(d => !twIds.has(d.id));
+  const newDeals      = thisWeek.filter(d => !lwMap.has(d.id));
+  const newARR        = newDeals.reduce((s, d) => s + d.value, 0);
+  const removedARR    = removedDeals.reduce((s, d) => s + d.value, 0);
+  const changedDelta  = thisWeek
+    .filter(d => lwMap.has(d.id))
+    .reduce((s, d) => s + (d.value - lwMap.get(d.id)!.value), 0);
+  const net = newARR - removedARR + changedDelta;
 
-  const changedDeals = thisWeek
-    .filter(d => {
-      const prev = lastWeek.find(ld => ld.id === d.id);
-      return prev && (prev.value !== d.value || prev.stage !== d.stage || prev.forecastCategory !== d.forecastCategory);
-    })
-    .map(d => ({ current: d, previous: lastWeek.find(ld => ld.id === d.id)! }));
-
-  const newARR      = newDeals.reduce((s, d) => s + d.value, 0);
-  const removedARR  = removedDeals.reduce((s, d) => s + d.value, 0);
-  const changedDelta = changedDeals.reduce((s, { current, previous }) => s + (current.value - previous.value), 0);
-  const net         = newARR - removedARR + changedDelta;
+  const sorted = [...thisWeek].sort((a, b) => a.closeDate.localeCompare(b.closeDate));
 
   return (
     <div>
-      {/* Net summary */}
+      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Net Movement',   value: (net >= 0 ? '+' : '') + fmt(net),       color: net >= 0 ? 'text-emerald-600' : 'text-red-500',         border: 'border-gray-200'   },
-          { label: 'Added',          value: '+' + fmt(newARR),                       color: 'text-emerald-600',                                       border: 'border-emerald-200' },
-          { label: 'Removed',        value: '-' + fmt(removedARR),                  color: 'text-red-500',                                           border: 'border-red-200'     },
-          { label: 'Value Changes',  value: (changedDelta >= 0 ? '+' : '') + fmt(changedDelta), color: changedDelta >= 0 ? 'text-emerald-600' : 'text-red-500', border: 'border-blue-200' },
+          { label: 'Net Movement',  value: (net >= 0 ? '+' : '') + fmt(net),              color: net >= 0 ? 'text-emerald-600' : 'text-red-500',              border: 'border-gray-200'    },
+          { label: 'Added',         value: '+' + fmt(newARR),                              color: 'text-emerald-600',                                            border: 'border-emerald-200' },
+          { label: 'Removed',       value: '-' + fmt(removedARR),                         color: 'text-red-500',                                                border: 'border-red-200'     },
+          { label: 'Value Changes', value: (changedDelta >= 0 ? '+' : '') + fmt(changedDelta), color: changedDelta >= 0 ? 'text-emerald-600' : 'text-red-500', border: 'border-blue-200'    },
         ].map(m => (
           <div key={m.label} className={`bg-white rounded-xl border p-4 ${m.border}`}>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{m.label}</p>
@@ -48,139 +66,96 @@ export default function WoWView({ thisWeek, lastWeek }: WoWViewProps) {
         ))}
       </div>
 
-      <div className="space-y-5">
-        {/* New deals */}
-        <Section title={`New Deals (${newDeals.length})`} color="emerald" empty="No new deals this week">
-          {newDeals.length > 0 && (
-            <DealTable deals={newDeals} valuePrefix="+" valueColor="text-emerald-700" />
-          )}
-        </Section>
+      {/* Detail table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold text-white" style={{ backgroundColor: '#1e3a5f' }}>
+                <th className="px-4 py-3 font-semibold">Client</th>
+                <th className="px-4 py-3 font-semibold">Close Date<br /><span className="font-normal opacity-70">(Last Week)</span></th>
+                <th className="px-4 py-3 font-semibold">Close Date</th>
+                <th className="px-4 py-3 font-semibold">Forecast Category<br /><span className="font-normal opacity-70">(Last Week)</span></th>
+                <th className="px-4 py-3 font-semibold">Forecast Category</th>
+                <th className="px-4 py-3 font-semibold text-right">Deal Value<br /><span className="font-normal opacity-70">(Last Week)</span></th>
+                <th className="px-4 py-3 font-semibold text-right">Deal Value</th>
+                <th className="px-4 py-3 font-semibold text-right">Change in<br />Deal Value</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {sorted.map((deal, i) => {
+                const prev   = lwMap.get(deal.id);
+                const isNew  = !prev;
+                const rowBg  = i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
 
-        {/* Removed deals */}
-        <Section title={`Removed (${removedDeals.length})`} color="red" empty="No deals removed">
-          {removedDeals.length > 0 && (
-            <DealTable deals={removedDeals} valuePrefix="-" valueColor="text-red-600" />
-          )}
-        </Section>
+                const dateChanged  = prev && prev.closeDate !== deal.closeDate;
+                const dateLater    = dateChanged && deal.closeDate > prev!.closeDate;
+                const dateEarlier  = dateChanged && deal.closeDate < prev!.closeDate;
 
-        {/* Changed deals */}
-        <Section title={`Changes (${changedDeals.length})`} color="blue" empty="No changes this week">
-          {changedDeals.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <th className="px-5 py-3">Company</th>
-                    <th className="px-5 py-3">Owner</th>
-                    <th className="px-5 py-3">Stage</th>
-                    <th className="px-5 py-3">Forecast</th>
-                    <th className="px-5 py-3 text-right">ARR Change</th>
+                const fcChanged    = prev && prev.forecastCategory !== deal.forecastCategory;
+                const fcImproved   = fcChanged && (FC_ORDER[deal.forecastCategory] ?? 0) > (FC_ORDER[prev!.forecastCategory] ?? 0);
+                const fcDowngraded = fcChanged && (FC_ORDER[deal.forecastCategory] ?? 0) < (FC_ORDER[prev!.forecastCategory] ?? 0);
+
+                const delta = isNew ? deal.value : deal.value - prev!.value;
+
+                return (
+                  <tr key={deal.id} className={rowBg}>
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{deal.company}</td>
+
+                    {/* Close date last week */}
+                    <td className="px-4 py-2.5 text-gray-500 text-xs">
+                      {isNew ? <span className="text-emerald-600 font-medium">New</span> : fmtDate(prev!.closeDate)}
+                    </td>
+
+                    {/* Close date current — highlight if changed */}
+                    <td className={`px-4 py-2.5 text-xs font-medium rounded-sm ${
+                      dateLater   ? 'bg-red-100 text-red-700'   :
+                      dateEarlier ? 'bg-green-100 text-green-700' :
+                      'text-gray-700'
+                    }`}>
+                      {fmtDate(deal.closeDate)}
+                    </td>
+
+                    {/* Forecast last week */}
+                    <td className="px-4 py-2.5 text-gray-500 text-xs">
+                      {isNew ? '-' : prev!.forecastCategory}
+                    </td>
+
+                    {/* Forecast current — highlight if changed */}
+                    <td className={`px-4 py-2.5 text-xs font-medium ${
+                      fcImproved   ? 'bg-green-100 text-green-700' :
+                      fcDowngraded ? 'bg-red-100 text-red-700'     :
+                      'text-gray-700'
+                    }`}>
+                      {deal.forecastCategory}
+                    </td>
+
+                    {/* Deal value last week */}
+                    <td className="px-4 py-2.5 text-right text-gray-500 text-xs">
+                      {isNew ? '-' : fmtK(prev!.value)}
+                    </td>
+
+                    {/* Deal value current */}
+                    <td className="px-4 py-2.5 text-right font-medium text-slate-800">
+                      {fmtK(deal.value)}
+                    </td>
+
+                    {/* Change in deal value */}
+                    <td className={`px-4 py-2.5 text-right font-medium ${
+                      delta < 0 ? 'bg-red-100 text-red-700' :
+                      delta > 0 && !isNew ? 'bg-green-100 text-green-700' :
+                      isNew ? 'text-emerald-600' :
+                      'text-gray-400'
+                    }`}>
+                      {isNew ? fmtK(deal.value) : fmtDelta(delta)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {changedDeals.map(({ current, previous }) => {
-                    const delta = current.value - previous.value;
-                    return (
-                      <tr key={current.id} className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium text-slate-800">{current.company}</td>
-                        <td className="px-5 py-3 text-gray-600">{current.owner}</td>
-                        <td className="px-5 py-3">
-                          {previous.stage !== current.stage ? (
-                            <span className="text-xs">
-                              <span className="text-gray-400 line-through">{previous.stage}</span>
-                              <span className="mx-1 text-gray-400">→</span>
-                              <span className="text-slate-700 font-medium">{current.stage}</span>
-                            </span>
-                          ) : <span className="text-gray-600">{current.stage}</span>}
-                        </td>
-                        <td className="px-5 py-3">
-                          {previous.forecastCategory !== current.forecastCategory ? (
-                            <span className="text-xs">
-                              <span className="text-gray-400 line-through">{previous.forecastCategory}</span>
-                              <span className="mx-1 text-gray-400">→</span>
-                              <span className="text-slate-700 font-medium">{current.forecastCategory}</span>
-                            </span>
-                          ) : <span className="text-gray-600">{current.forecastCategory}</span>}
-                        </td>
-                        <td className="px-5 py-3 text-right">
-                          {delta !== 0 ? (
-                            <span className={`font-semibold ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                              {delta > 0 ? '+' : ''}{fmt(delta)}
-                            </span>
-                          ) : <span className="text-gray-400">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Section>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function Section({
-  title, color, empty, children,
-}: {
-  title: string;
-  color: 'emerald' | 'red' | 'blue';
-  empty: string;
-  children?: React.ReactNode;
-}) {
-  const headerMap = {
-    emerald: 'bg-emerald-50 border-emerald-100 text-emerald-800 bg-emerald-500',
-    red:     'bg-red-50 border-red-100 text-red-800 bg-red-500',
-    blue:    'bg-blue-50 border-blue-100 text-blue-800 bg-blue-500',
-  };
-  const [bg, border, text, dot] = headerMap[color].split(' ');
-
-  return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className={`px-5 py-4 ${bg} border-b ${border} flex items-center gap-2`}>
-        <span className={`w-2 h-2 rounded-full ${dot}`} />
-        <h3 className={`font-semibold ${text}`}>{title}</h3>
-      </div>
-      {children ?? <p className="px-5 py-4 text-sm text-gray-400">{empty}</p>}
-    </section>
-  );
-}
-
-function DealTable({
-  deals, valuePrefix, valueColor,
-}: {
-  deals: Deal[];
-  valuePrefix: string;
-  valueColor: string;
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            <th className="px-5 py-3">Company</th>
-            <th className="px-5 py-3">Owner</th>
-            <th className="px-5 py-3">Stage</th>
-            <th className="px-5 py-3">Forecast</th>
-            <th className="px-5 py-3 text-right">ARR</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {deals.map(d => (
-            <tr key={d.id} className="hover:bg-gray-50">
-              <td className="px-5 py-3 font-medium text-slate-800">{d.company}</td>
-              <td className="px-5 py-3 text-gray-600">{d.owner}</td>
-              <td className="px-5 py-3 text-gray-600">{d.stage}</td>
-              <td className="px-5 py-3 text-gray-600">{d.forecastCategory}</td>
-              <td className={`px-5 py-3 text-right font-semibold ${valueColor}`}>
-                {valuePrefix}{fmt(d.value)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
