@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>B2B Trading Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    details summary::-webkit-details-marker { display: none; }
+    details summary { list-style: none; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Loading -->
+  <div id="loading" class="flex items-center justify-center min-h-screen">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
+      <p class="text-gray-500 text-sm">Loading dashboard...</p>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="app" class="hidden">
+    <header class="bg-slate-900 text-white shadow-lg">
+      <div class="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
+          <p id="weekLabel" class="text-slate-400 text-sm mt-0.5"></p>
+        </div>
+        <div class="text-right">
+          <p class="text-slate-500 text-xs">Last updated</p>
+          <p id="fetchTime" class="text-slate-300 text-sm font-medium"></p>
+        </div>
+      </div>
+      <div class="max-w-screen-xl mx-auto px-6">
+        <nav class="flex gap-1 pt-2" id="areaTabs"></nav>
+      </div>
+    </header>
+
+    <div id="subTabBar" class="bg-white border-b border-gray-200 shadow-sm hidden">
+      <div class="max-w-screen-xl mx-auto px-6">
+        <nav class="flex gap-6" id="subTabs"></nav>
+      </div>
+    </div>
+
+    <main class="max-w-screen-xl mx-auto px-6 py-6" id="content"></main>
+  </div>
+
+  <script>
+    // ── Config ────────────────────────────────────────────────────────────────
+    var AREAS = [
+      { key: 'new-business',     label: 'New Business',     color: '#3B82F6' },
+      { key: 'customer-success', label: 'Customer Success', color: '#10B981' },
+      { key: 'resellers',        label: 'Resellers',        color: '#8B5CF6' },
+      { key: 'guild',            label: 'Guild',            color: '#F59E0B' }
+    ];
+    var SUB_TABS = [
+      { key: 'results',  label: 'Results'      },
+      { key: 'forecast', label: 'SD Forecast'  },
+      { key: 'wow',      label: 'WoW Changes'  }
+    ];
+    var FORECAST_BADGE = {
+      'Commit':    'bg-emerald-100 text-emerald-800',
+      'Best Case': 'bg-blue-100 text-blue-800',
+      'Pipeline':  'bg-gray-100 text-gray-700',
+      'Omitted':   'bg-red-100 text-red-700'
+    };
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    var data        = { thisWeek: [], lastWeek: [] };
+    var activeArea  = 'summary';
+    var activeSubTab = 'results';
+    var filterFrom   = '';
+    var filterTo     = '';
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function fmt(v) {
+      return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(v);
+    }
+    function fmtDelta(v) { return (v >= 0 ? '+' : '') + fmt(v); }
+    function deltaClass(v) { return v >= 0 ? 'text-emerald-600' : 'text-red-500'; }
+    function fmtDate(str) {
+      if (!str) return '';
+      var d = new Date(str);
+      return isNaN(d) ? str : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    }
+    function getMetrics(deals, area) {
+      var d = area ? deals.filter(function(x) { return x.area === area; }) : deals;
+      return {
+        totalARR:  d.reduce(function(s,x) { return s + x.value; }, 0),
+        dealCount: d.length,
+        commitARR: d.filter(function(x) { return x.forecastCategory === 'Commit'; }).reduce(function(s,x) { return s + x.value; }, 0),
+        bestCase:  d.filter(function(x) { return x.forecastCategory === 'Best Case'; }).reduce(function(s,x) { return s + x.value; }, 0)
+      };
+    }
+
+    function filteredByDate(deals) {
+      if (!filterFrom && !filterTo) return deals;
+      return deals.filter(function(d) {
+        var dt = d.closeDate ? d.closeDate.substring(0, 10) : '';
+        if (!dt) return true;
+        if (filterFrom && dt < filterFrom) return false;
+        if (filterTo   && dt > filterTo)   return false;
+        return true;
+      });
+    }
+    function setFilter(from, to) { filterFrom = from; filterTo = to; render(); }
+    function clearFilter() { filterFrom = ''; filterTo = ''; render(); }
+
+    // ── Shared components ─────────────────────────────────────────────────────
+    function metricCard(label, value, sub) {
+      return '<div class="bg-white rounded-xl border border-gray-200 p-4">' +
+        '<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">' + label + '</p>' +
+        '<p class="text-2xl font-bold text-slate-900 mt-1">' + value + '</p>' +
+        (sub ? '<p class="text-sm text-gray-400 mt-1">' + sub + '</p>' : '') +
+        '</div>';
+    }
+
+    function simpleDealTable(deals, valPrefix, valClass) {
+      if (!deals.length) return '<p class="px-5 py-4 text-sm text-gray-400">None this week</p>';
+      return '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+        '<thead><tr class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' +
+        '<th class="px-5 py-3">Company</th><th class="px-5 py-3">Owner</th>' +
+        '<th class="px-5 py-3">Stage</th><th class="px-5 py-3">Forecast</th>' +
+        '<th class="px-5 py-3 text-right">ARR</th></tr></thead>' +
+        '<tbody class="divide-y divide-gray-100">' +
+        deals.map(function(d) {
+          return '<tr class="hover:bg-gray-50">' +
+            '<td class="px-5 py-3 font-medium text-slate-800">' + d.company + '</td>' +
+            '<td class="px-5 py-3 text-gray-600">' + d.owner + '</td>' +
+            '<td class="px-5 py-3 text-gray-600">' + d.stage + '</td>' +
+            '<td class="px-5 py-3 text-gray-600">' + d.forecastCategory + '</td>' +
+            '<td class="px-5 py-3 text-right font-semibold ' + valClass + '">' + valPrefix + fmt(d.value) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+
+    function wowSection(title, color, body) {
+      var c = {
+        emerald: { bg:'bg-emerald-50', border:'border-emerald-100', text:'text-emerald-800', dot:'bg-emerald-500' },
+        red:     { bg:'bg-red-50',     border:'border-red-100',     text:'text-red-800',     dot:'bg-red-500'     },
+        blue:    { bg:'bg-blue-50',    border:'border-blue-100',    text:'text-blue-800',    dot:'bg-blue-500'    }
+      }[color];
+      return '<section class="bg-white rounded-xl border border-gray-200 overflow-hidden">' +
+        '<div class="px-5 py-4 ' + c.bg + ' border-b ' + c.border + ' flex items-center gap-2">' +
+        '<span class="w-2 h-2 rounded-full ' + c.dot + '"></span>' +
+        '<h3 class="font-semibold ' + c.text + '">' + title + '</h3></div>' +
+        body + '</section>';
+    }
+
+    // ── Views ─────────────────────────────────────────────────────────────────
+    function renderSummary() {
+      var tw = getMetrics(data.thisWeek);
+      var lw = getMetrics(data.lastWeek);
+      var delta = tw.totalARR - lw.totalARR;
+      var pct = lw.totalARR > 0 ? ((delta / lw.totalARR) * 100).toFixed(1) : '0.0';
+
+      var top = '<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">' +
+        metricCard('Total Pipeline ARR', fmt(tw.totalARR), tw.dealCount + ' deals across all areas') +
+        metricCard('Total Commit', fmt(tw.commitARR), 'Best Case: ' + fmt(tw.bestCase)) +
+        '<div class="bg-white rounded-xl border border-gray-200 p-4">' +
+          '<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">WoW Movement</p>' +
+          '<p class="text-2xl font-bold mt-1 ' + deltaClass(delta) + '">' + fmtDelta(delta) + '</p>' +
+          '<p class="text-sm text-gray-400 mt-1">' + (delta >= 0 ? '+' : '') + pct + '% vs last week</p>' +
+        '</div></div>';
+
+      var cards = AREAS.map(function(area) {
+        var tw = getMetrics(data.thisWeek, area.key);
+        var lw = getMetrics(data.lastWeek, area.key);
+        var d  = tw.totalARR - lw.totalARR;
+        return '<button onclick="goArea(\'' + area.key + '\')" ' +
+          'class="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md hover:border-gray-300 transition-all group w-full">' +
+          '<div class="flex items-center justify-between mb-4">' +
+            '<div class="flex items-center gap-2.5">' +
+              '<span class="w-3 h-3 rounded-full" style="background:' + area.color + '"></span>' +
+              '<h3 class="font-semibold text-slate-800">' + area.label + '</h3></div>' +
+            '<span class="text-xs text-gray-400 group-hover:text-slate-600">View details →</span></div>' +
+          '<div class="grid grid-cols-3 gap-3">' +
+            '<div><p class="text-xs text-gray-500">Total ARR</p><p class="text-lg font-bold text-slate-900">' + fmt(tw.totalARR) + '</p></div>' +
+            '<div><p class="text-xs text-gray-500">Commit</p><p class="text-lg font-bold text-slate-900">' + fmt(tw.commitARR) + '</p></div>' +
+            '<div><p class="text-xs text-gray-500">WoW</p><p class="text-lg font-bold ' + deltaClass(d) + '">' + fmtDelta(d) + '</p></div>' +
+          '</div>' +
+          '<div class="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-xs text-gray-400">' +
+            '<span>' + tw.dealCount + ' deals</span><span>Best Case: ' + fmt(tw.bestCase) + '</span></div>' +
+        '</button>';
+      }).join('');
+
+      return top +
+        '<h2 class="text-base font-semibold text-slate-700 mb-3">Areas</h2>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' + cards + '</div>';
+    }
+
+    function renderResults(deals) {
+      var m      = getMetrics(deals);
+      var sorted = deals.slice().sort(function(a,b) { return b.value - a.value; });
+      var rows   = sorted.map(function(d) {
+        var badge = FORECAST_BADGE[d.forecastCategory] || 'bg-gray-100 text-gray-700';
+        return '<tr class="hover:bg-gray-50">' +
+          '<td class="px-5 py-3 font-medium text-slate-800">' + d.company + '</td>' +
+          '<td class="px-5 py-3 text-gray-600">' + d.owner + '</td>' +
+          '<td class="px-5 py-3 text-gray-600">' + d.stage + '</td>' +
+          '<td class="px-5 py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ' + badge + '">' + d.forecastCategory + '</span></td>' +
+          '<td class="px-5 py-3 text-right font-semibold text-slate-800">' + fmt(d.value) + '</td>' +
+          '<td class="px-5 py-3 text-gray-500">' + fmtDate(d.closeDate) + '</td></tr>';
+      }).join('');
+
+      return '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">' +
+          metricCard('Total ARR', fmt(m.totalARR)) + metricCard('Commit', fmt(m.commitARR)) +
+          metricCard('Best Case', fmt(m.bestCase)) + metricCard('Deals', m.dealCount) +
+        '</div>' +
+        '<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">' +
+          '<div class="px-5 py-4 border-b border-gray-100"><h3 class="font-semibold text-slate-800">All Deals</h3></div>' +
+          '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+            '<thead><tr class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' +
+              '<th class="px-5 py-3">Company</th><th class="px-5 py-3">Owner</th>' +
+              '<th class="px-5 py-3">Stage</th><th class="px-5 py-3">Forecast</th>' +
+              '<th class="px-5 py-3 text-right">ARR</th><th class="px-5 py-3">Close Date</th>' +
+            '</tr></thead>' +
+            '<tbody class="divide-y divide-gray-100">' + rows + '</tbody>' +
+            '<tfoot><tr class="bg-gray-50 font-semibold text-slate-800 border-t border-gray-200">' +
+              '<td class="px-5 py-3" colspan="4">Total</td>' +
+              '<td class="px-5 py-3 text-right">' + fmt(m.totalARR) + '</td><td></td>' +
+            '</tr></tfoot>' +
+          '</table></div>' +
+        '</div>';
+    }
+
+    function renderForecast(deals) {
+      var byOwner = {};
+      deals.forEach(function(d) { if (!byOwner[d.owner]) byOwner[d.owner] = []; byOwner[d.owner].push(d); });
+      var rows = Object.keys(byOwner).map(function(owner) {
+        var ds = byOwner[owner];
+        return {
+          owner: owner, deals: ds,
+          commit:   ds.filter(function(d) { return d.forecastCategory === 'Commit'; }).reduce(function(s,d) { return s+d.value; }, 0),
+          bestCase: ds.filter(function(d) { return d.forecastCategory === 'Best Case'; }).reduce(function(s,d) { return s+d.value; }, 0),
+          pipeline: ds.filter(function(d) { return d.forecastCategory === 'Pipeline'; }).reduce(function(s,d) { return s+d.value; }, 0),
+          total:    ds.reduce(function(s,d) { return s+d.value; }, 0)
+        };
+      }).sort(function(a,b) { return b.total - a.total; });
+
+      var g = {
+        commit:   deals.filter(function(d) { return d.forecastCategory === 'Commit'; }).reduce(function(s,d) { return s+d.value; }, 0),
+        bestCase: deals.filter(function(d) { return d.forecastCategory === 'Best Case'; }).reduce(function(s,d) { return s+d.value; }, 0),
+        pipeline: deals.filter(function(d) { return d.forecastCategory === 'Pipeline'; }).reduce(function(s,d) { return s+d.value; }, 0),
+        total:    deals.reduce(function(s,d) { return s+d.value; }, 0)
+      };
+
+      var cats = '<div class="grid grid-cols-3 gap-4 mb-6">' +
+        '<div class="rounded-xl border bg-emerald-50 border-emerald-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Commit</p><p class="text-2xl font-bold text-emerald-600 mt-1">' + fmt(g.commit) + '</p></div>' +
+        '<div class="rounded-xl border bg-blue-50 border-blue-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Best Case</p><p class="text-2xl font-bold text-blue-600 mt-1">' + fmt(g.bestCase) + '</p></div>' +
+        '<div class="rounded-xl border bg-gray-50 border-gray-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Pipeline</p><p class="text-2xl font-bold text-gray-600 mt-1">' + fmt(g.pipeline) + '</p></div>' +
+        '</div>';
+
+      var sdRows = rows.map(function(r) {
+        return '<tr class="hover:bg-gray-50">' +
+          '<td class="px-5 py-3 font-medium text-slate-800">' + r.owner + '</td>' +
+          '<td class="px-5 py-3 text-right font-medium text-emerald-700">' + fmt(r.commit) + '</td>' +
+          '<td class="px-5 py-3 text-right text-blue-700">' + fmt(r.bestCase) + '</td>' +
+          '<td class="px-5 py-3 text-right text-gray-600">' + fmt(r.pipeline) + '</td>' +
+          '<td class="px-5 py-3 text-right font-semibold text-slate-800">' + fmt(r.total) + '</td>' +
+          '<td class="px-5 py-3 text-right text-gray-500">' + r.deals.length + '</td></tr>';
+      }).join('');
+
+      var summaryTable = '<div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">' +
+        '<div class="px-5 py-4 border-b border-gray-100"><h3 class="font-semibold text-slate-800">Sales Director Summary</h3></div>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+          '<thead><tr class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' +
+            '<th class="px-5 py-3">Sales Director</th><th class="px-5 py-3 text-right">Commit</th>' +
+            '<th class="px-5 py-3 text-right">Best Case</th><th class="px-5 py-3 text-right">Pipeline</th>' +
+            '<th class="px-5 py-3 text-right">Total</th><th class="px-5 py-3 text-right">Deals</th>' +
+          '</tr></thead>' +
+          '<tbody class="divide-y divide-gray-100">' + sdRows + '</tbody>' +
+          '<tfoot><tr class="bg-gray-50 font-semibold text-slate-800 border-t border-gray-200">' +
+            '<td class="px-5 py-3">Total</td>' +
+            '<td class="px-5 py-3 text-right text-emerald-700">' + fmt(g.commit) + '</td>' +
+            '<td class="px-5 py-3 text-right text-blue-700">' + fmt(g.bestCase) + '</td>' +
+            '<td class="px-5 py-3 text-right text-gray-600">' + fmt(g.pipeline) + '</td>' +
+            '<td class="px-5 py-3 text-right">' + fmt(g.total) + '</td>' +
+            '<td class="px-5 py-3 text-right">' + deals.length + '</td>' +
+          '</tr></tfoot>' +
+        '</table></div></div>';
+
+      var breakdown = '<div class="space-y-3">' +
+        rows.map(function(r) {
+          var dealRows = r.deals.slice().sort(function(a,b) { return b.value - a.value; }).map(function(d) {
+            return '<tr><td class="px-8 py-2 text-slate-700 font-medium">' + d.company + '</td>' +
+              '<td class="px-5 py-2 text-gray-600">' + d.stage + '</td>' +
+              '<td class="px-5 py-2 text-gray-600">' + d.forecastCategory + '</td>' +
+              '<td class="px-5 py-2 text-right font-semibold text-slate-800">' + fmt(d.value) + '</td></tr>';
+          }).join('');
+          return '<details class="bg-white rounded-xl border border-gray-200 overflow-hidden">' +
+            '<summary class="px-5 py-3 text-sm font-medium text-slate-700 cursor-pointer hover:bg-gray-50 flex items-center justify-between">' +
+              '<span>' + r.owner + ' — ' + r.deals.length + ' deal' + (r.deals.length !== 1 ? 's' : '') + '</span>' +
+              '<span class="text-gray-400 text-xs">expand ▾</span></summary>' +
+            '<div class="overflow-x-auto border-t border-gray-100"><table class="w-full text-sm bg-gray-50">' +
+              '<thead><tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' +
+                '<th class="px-8 py-2">Company</th><th class="px-5 py-2">Stage</th>' +
+                '<th class="px-5 py-2">Forecast</th><th class="px-5 py-2 text-right">ARR</th>' +
+              '</tr></thead><tbody class="divide-y divide-gray-100">' + dealRows + '</tbody>' +
+            '</table></div></details>';
+        }).join('') + '</div>';
+
+      return cats + summaryTable + breakdown;
+    }
+
+    function renderWoW(thisWeek, lastWeek) {
+      var twIds = {};
+      thisWeek.forEach(function(d) { twIds[d.id] = d; });
+      var lwIds = {};
+      lastWeek.forEach(function(d) { lwIds[d.id] = d; });
+
+      var newDeals     = thisWeek.filter(function(d) { return !lwIds[d.id]; });
+      var removedDeals = lastWeek.filter(function(d) { return !twIds[d.id]; });
+      var changedDeals = thisWeek.filter(function(d) {
+        var p = lwIds[d.id];
+        return p && (p.value !== d.value || p.stage !== d.stage || p.forecastCategory !== d.forecastCategory);
+      }).map(function(d) { return { current: d, previous: lwIds[d.id] }; });
+
+      var newARR       = newDeals.reduce(function(s,d) { return s+d.value; }, 0);
+      var removedARR   = removedDeals.reduce(function(s,d) { return s+d.value; }, 0);
+      var changedDelta = changedDeals.reduce(function(s,p) { return s + (p.current.value - p.previous.value); }, 0);
+      var net          = newARR - removedARR + changedDelta;
+
+      var topCards = '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">' +
+        '<div class="bg-white rounded-xl border border-gray-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Net Movement</p><p class="text-2xl font-bold mt-1 ' + deltaClass(net) + '">' + fmtDelta(net) + '</p></div>' +
+        '<div class="bg-white rounded-xl border border-emerald-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Added</p><p class="text-2xl font-bold text-emerald-600 mt-1">+' + fmt(newARR) + '</p></div>' +
+        '<div class="bg-white rounded-xl border border-red-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Removed</p><p class="text-2xl font-bold text-red-500 mt-1">-' + fmt(removedARR) + '</p></div>' +
+        '<div class="bg-white rounded-xl border border-blue-200 p-4"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Value Changes</p><p class="text-2xl font-bold mt-1 ' + deltaClass(changedDelta) + '">' + fmtDelta(changedDelta) + '</p></div>' +
+        '</div>';
+
+      var changesBody;
+      if (!changedDeals.length) {
+        changesBody = '<p class="px-5 py-4 text-sm text-gray-400">No changes this week</p>';
+      } else {
+        var cRows = changedDeals.map(function(p) {
+          var c = p.current, prev = p.previous;
+          var d = c.value - prev.value;
+          var stageCell = prev.stage !== c.stage
+            ? '<span class="text-xs"><span class="text-gray-400 line-through">' + prev.stage + '</span> → <span class="text-slate-700 font-medium">' + c.stage + '</span></span>'
+            : '<span class="text-gray-600">' + c.stage + '</span>';
+          var fcCell = prev.forecastCategory !== c.forecastCategory
+            ? '<span class="text-xs"><span class="text-gray-400 line-through">' + prev.forecastCategory + '</span> → <span class="text-slate-700 font-medium">' + c.forecastCategory + '</span></span>'
+            : '<span class="text-gray-600">' + c.forecastCategory + '</span>';
+          var valCell = d !== 0
+            ? '<span class="font-semibold ' + deltaClass(d) + '">' + fmtDelta(d) + '</span>'
+            : '<span class="text-gray-400">—</span>';
+          return '<tr class="hover:bg-gray-50">' +
+            '<td class="px-5 py-3 font-medium text-slate-800">' + c.company + '</td>' +
+            '<td class="px-5 py-3 text-gray-600">' + c.owner + '</td>' +
+            '<td class="px-5 py-3">' + stageCell + '</td>' +
+            '<td class="px-5 py-3">' + fcCell + '</td>' +
+            '<td class="px-5 py-3 text-right">' + valCell + '</td></tr>';
+        }).join('');
+        changesBody = '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+          '<thead><tr class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' +
+            '<th class="px-5 py-3">Company</th><th class="px-5 py-3">Owner</th>' +
+            '<th class="px-5 py-3">Stage</th><th class="px-5 py-3">Forecast</th>' +
+            '<th class="px-5 py-3 text-right">ARR Change</th>' +
+          '</tr></thead><tbody class="divide-y divide-gray-100">' + cRows + '</tbody>' +
+          '</table></div>';
+      }
+
+      return topCards + '<div class="space-y-5">' +
+        wowSection('New Deals (' + newDeals.length + ')',     'emerald', simpleDealTable(newDeals,     '+', 'text-emerald-700')) +
+        wowSection('Removed ('   + removedDeals.length + ')', 'red',     simpleDealTable(removedDeals, '-', 'text-red-600'))     +
+        wowSection('Changes ('   + changedDeals.length + ')', 'blue',    changesBody) +
+        '</div>';
+    }
+
+    // ── Navigation ─────────────────────────────────────────────────────────────
+    function goArea(area) {
+      activeArea   = area;
+      activeSubTab = 'results';
+      filterFrom   = '';
+      filterTo     = '';
+      render();
+    }
+    function goSubTab(tab) {
+      activeSubTab = tab;
+      render();
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────────
+    function render() {
+      var allTabs = [{ key: 'summary', label: 'Overview', color: null }].concat(AREAS);
+      document.getElementById('areaTabs').innerHTML = allTabs.map(function(a) {
+        var active = activeArea === a.key;
+        return '<button onclick="goArea(\'' + a.key + '\')" class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ' +
+          (active ? 'bg-gray-50 text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-700') + '">' +
+          a.label + '</button>';
+      }).join('');
+
+      var areaConfig = AREAS.filter(function(a) { return a.key === activeArea; })[0];
+      var subBar = document.getElementById('subTabBar');
+
+      if (activeArea === 'summary') {
+        subBar.classList.add('hidden');
+      } else {
+        subBar.classList.remove('hidden');
+        document.getElementById('subTabs').innerHTML = SUB_TABS.map(function(t) {
+          var active = activeSubTab === t.key;
+          return '<button onclick="goSubTab(\'' + t.key + '\')" class="py-3 text-sm font-medium border-b-2 transition-colors ' +
+            (active ? '' : 'border-transparent text-gray-500 hover:text-gray-700') + '" ' +
+            (active ? 'style="border-color:' + areaConfig.color + ';color:' + areaConfig.color + '"' : '') + '>' +
+            t.label + '</button>';
+        }).join('');
+      }
+
+      var content = document.getElementById('content');
+      if (activeArea === 'summary') {
+        content.innerHTML = renderSummary();
+      } else {
+        var cfg = areaConfig;
+        var tw  = filteredByDate(data.thisWeek.filter(function(d) { return d.area === activeArea; }));
+        var lw  = filteredByDate(data.lastWeek.filter(function(d) { return d.area === activeArea; }));
+        var clearBtn = (filterFrom || filterTo)
+          ? '<button onclick="clearFilter()" class="text-xs text-gray-400 hover:text-red-500 underline">Clear</button>'
+          : '';
+        var header = '<div class="flex items-center gap-3 mb-5">' +
+          '<span class="w-4 h-4 rounded-full" style="background:' + cfg.color + '"></span>' +
+          '<h2 class="text-xl font-bold text-slate-900">' + cfg.label + '</h2>' +
+          '<div class="ml-auto flex items-center gap-2">' +
+            '<span class="text-xs text-gray-500">Close date</span>' +
+            '<input type="date" value="' + filterFrom + '" onchange="setFilter(this.value, filterTo)" class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-slate-700">' +
+            '<span class="text-xs text-gray-400">to</span>' +
+            '<input type="date" value="' + filterTo + '" onchange="setFilter(filterFrom, this.value)" class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-slate-700">' +
+            clearBtn +
+          '</div>' +
+          '</div>';
+        var view = '';
+        if (activeSubTab === 'results')  view = renderResults(tw);
+        if (activeSubTab === 'forecast') view = renderForecast(tw);
+        if (activeSubTab === 'wow')      view = renderWoW(tw, lw);
+        content.innerHTML = header + view;
+      }
+    }
+
+    // ── Boot ───────────────────────────────────────────────────────────────────
+    google.script.run
+      .withSuccessHandler(function(result) {
+        data = result;
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        var now = new Date();
+        document.getElementById('weekLabel').textContent =
+          'Week of ' + now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        document.getElementById('fetchTime').textContent =
+          new Date(result.fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        render();
+      })
+      .withFailureHandler(function(err) {
+        document.getElementById('loading').innerHTML =
+          '<div class="text-center text-red-500"><p class="font-semibold">Failed to load data</p>' +
+          '<p class="text-sm mt-1">' + err + '</p></div>';
+      })
+      .getDashboardData();
+  </script>
+</body>
+</html>
