@@ -146,7 +146,7 @@ export default function ResultsView({ deals }: ResultsViewProps) {
           deals={inProgress}
           totalARR={inpARR}
           headerClass="bg-blue-50 text-blue-800 hover:bg-blue-100"
-          defaultOpen={true}
+          defaultOpen={false}
         />
         <DealGroup
           title="Closed Lost"

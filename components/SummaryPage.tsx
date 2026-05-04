@@ -85,7 +85,7 @@ function CommentRow({ period, areaKey, initial }: {
 
   return (
     <tr className="bg-gray-50/30 border-b border-gray-100">
-      <td colSpan={6} className="px-5 py-2">
+      <td colSpan={5} className="px-5 py-1.5">
         {editing ? (
           <div className="flex items-start gap-2">
             <textarea
@@ -165,7 +165,7 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
             : `cursor-pointer hover:bg-blue-50/30 ${stripe ? 'bg-gray-50/40' : 'bg-white'}`
         }`}
       >
-        <td className="px-5 py-3.5">
+        <td className="px-5 py-2">
           <div className="flex items-center gap-2.5">
             {row.accentColor && (
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.accentColor }} />
@@ -173,21 +173,18 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
             <span className={isTotal ? 'text-slate-800 text-sm' : 'font-medium text-slate-700'}>{row.label}</span>
           </div>
         </td>
-        <td className="px-5 py-3.5 text-right">
+        <td className="px-5 py-2 text-right">
           <span className={`font-bold ${row.cw > 0 ? 'text-emerald-700' : 'text-gray-300'}`}>
             {row.cw > 0 ? fmtFull(row.cw) : '—'}
           </span>
         </td>
-        <td className="px-5 py-3.5 text-right">
+        <td className="px-5 py-2 text-right">
           <span className="text-gray-300 text-xs italic">TBC</span>
         </td>
-        <td className="px-5 py-3.5 text-right">
-          <DeltaCell delta={row.wow} base={row.wowBase} />
-        </td>
-        <td className="px-5 py-3.5 text-right">
+        <td className="px-5 py-2 text-right">
           <DeltaCell delta={row.yoy} base={row.yoyBase} />
         </td>
-        <td className="px-5 py-3.5 text-right">
+        <td className="px-5 py-2 text-right">
           {row.vsM !== null
             ? <DeltaCell delta={row.vsM} base={row.vsMBase} />
             : <span className="text-gray-300 text-xs italic">—</span>}
@@ -202,12 +199,11 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
-              <th className="px-5 py-3.5 text-left font-semibold text-xs uppercase tracking-wide">Area</th>
-              <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">Closed Won</th>
-              <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">SD Forecast</th>
-              <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">WoW</th>
-              <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">YoY</th>
-              <th className="px-5 py-3.5 text-right font-semibold text-xs uppercase tracking-wide">vs Forecast</th>
+              <th className="px-5 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Area</th>
+              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Closed Won</th>
+              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">SD Forecast</th>
+              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">YoY</th>
+              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">vs Forecast</th>
             </tr>
           </thead>
           <tbody>
