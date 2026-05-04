@@ -35,69 +35,70 @@ function findCol(H, candidates, defaultIdx) {
   return defaultIdx !== undefined ? defaultIdx : -1;
 }
 
+function parseSplit(val) {
+  if (!val || val === '-') return 0;
+  return parseFloat(String(val).replace(/[£$€,\s]/g, '')) || 0;
+}
+
 function readTab(ss, tabName) {
   var sheet = ss.getSheetByName(tabName);
   if (!sheet) { Logger.log('Tab not found: ' + tabName); return []; }
 
   var rows = sheet.getDataRange().getValues();
-  if (rows.length < 2) return [];
+  if (rows.length < 3) return [];
 
-  // Build header name → column index map from row 0
+  // Row 0 = group headers (SPLITS, CLOSE DATES etc)
+  // Row 1 = actual column names — this is the header row
   var H = {};
-  rows[0].forEach(function(h, i) { H[String(h).trim()] = i; });
-  Logger.log(tabName + ' headers: ' + JSON.stringify(Object.keys(H)));
+  rows[1].forEach(function(h, i) { H[String(h).trim()] = i; });
 
-  // Header name takes priority; hardcoded index is the fallback if name not found
   var C = {
-    DEAL_ID:        findCol(H, ['Deal ID', 'Record ID', 'ID'],                                                              0),
-    COMPANY_NAME:   findCol(H, ['Company Name', 'Company', 'Account Name'],                                                 2),
-    DEAL_OWNER:     findCol(H, ['Deal Owner', 'Owner', 'Deal owner'],                                                      12),
-    AMOUNT:         findCol(H, ['Amount', 'ARR', 'Annual Revenue'],                                                         6),
-    FORECAST_CAT:   findCol(H, ['Forecast Category', 'Hubspot Forecast Category', 'Forecast category', 'HS Forecast Category'], 10),
-    PIPELINE:       findCol(H, ['Pipeline'],                                                                               13),
-    CLOSE_DATE:     findCol(H, ['Close Date', 'Close date', 'Closedate'],                                                  15),
-    CLEAN_COMPANY:  findCol(H, ['Clean Company', 'Cleaned Company', 'clean_company'],                                      23),
-    CLOSE_DATE_C:   findCol(H, ['Close Date Clean', 'Clean Close Date', 'Closedate Clean'],                                28),
-    PIPELINE_STAGE: findCol(H, ['Pipeline Stage', 'Deal Stage', 'Stage', 'Lifecycle Stage'],                              37)
+    DEAL_ID:        findCol(H, ['Deal ID', 'Record ID'],                                         0),
+    COMPANY_NAME:   findCol(H, ['Company name', 'Company Name', 'Account Name'],                  2),
+    DEAL_OWNER:     findCol(H, ['Deal owner', 'Deal Owner', 'Owner'],                            12),
+    AMOUNT:         findCol(H, ['Amount in company currency', 'Amount', 'ARR'],                   6),
+    FORECAST_CAT:   findCol(H, ['Forecast category', 'Forecast Category'],                       10),
+    PIPELINE:       findCol(H, ['Pipeline'],                                                     13),
+    CLOSE_DATE:     findCol(H, ['Close Date'],                                                   15),
+    CLEAN_COMPANY:  findCol(H, ['Clean Company Name', 'Clean Company'],                          23),
+    CLOSE_DATE_C:   findCol(H, ['Close Date (excl time)', 'Close Date Clean'],                   28),
+    PIPELINE_STAGE: findCol(H, ['Pipeline Stage', 'Deal Stage'],                                 37),
+    NB_SPLIT:       findCol(H, ['NB Split'],                                                     42),
+    CS_SPLIT:       findCol(H, ['CS Split'],                                                     43),
   };
-  Logger.log('Resolved columns: ' + JSON.stringify(C));
-
-  // TODO: match exactly what appears in your Pipeline column
-  var PIPELINE_TO_AREA = {
-    'New Business':     'new-business',
-    'Customer Success': 'customer-success',
-    'Resellers':        'resellers',
-    'Guild':            'guild'
-  };
+  Logger.log(tabName + ' resolved columns: ' + JSON.stringify(C));
 
   var FORECAST_NORM = {
-    'commit':    'Commit',
-    'best case': 'Best Case',
-    'pipeline':  'Pipeline',
-    'omitted':   'Omitted'
+    'commit':     'Commit',
+    'closed won': 'Commit',
+    'best case':  'Best Case',
+    'pipeline':   'Pipeline',
+    'omitted':    'Omitted',
   };
 
   var tz = Session.getScriptTimeZone();
 
   var deals = [];
-  for (var i = 1; i < rows.length; i++) {
+
+  // Data starts at row index 2 (skipping group header + column header rows)
+  for (var i = 2; i < rows.length; i++) {
     var row = rows[i];
 
     var cleanCompany = C.CLEAN_COMPANY >= 0 ? String(row[C.CLEAN_COMPANY] || '').trim() : '';
     var company = cleanCompany || (C.COMPANY_NAME >= 0 ? String(row[C.COMPANY_NAME] || '').trim() : '');
+    if (!company) continue;
 
-    var rawAmount = C.AMOUNT >= 0 ? String(row[C.AMOUNT] || '0') : '0';
-    var value = parseFloat(rawAmount.replace(/[£$€,\s]/g, '')) || 0;
-
-    if (!company || value <= 0) continue;
+    var dealId = C.DEAL_ID >= 0 ? String(row[C.DEAL_ID] || '').trim() : '';
+    if (!dealId) continue;
 
     var pipeline = C.PIPELINE >= 0 ? String(row[C.PIPELINE] || '').trim() : '';
-    var area = PIPELINE_TO_AREA[pipeline] || 'new-business';
+    var owner    = C.DEAL_OWNER >= 0 ? String(row[C.DEAL_OWNER] || '').trim() : '';
+    var stage    = C.PIPELINE_STAGE >= 0 ? String(row[C.PIPELINE_STAGE] || '').trim() : '';
 
     var fcRaw = C.FORECAST_CAT >= 0 ? String(row[C.FORECAST_CAT] || '').toLowerCase().trim() : '';
     var forecastCategory = FORECAST_NORM[fcRaw] || 'Pipeline';
 
-    // Format close date as YYYY-MM-DD for easy filtering in the frontend
+    // Format close date as YYYY-MM-DD
     var rawDate = '';
     if (C.CLOSE_DATE_C >= 0 && row[C.CLOSE_DATE_C]) rawDate = row[C.CLOSE_DATE_C];
     else if (C.CLOSE_DATE >= 0 && row[C.CLOSE_DATE]) rawDate = row[C.CLOSE_DATE];
@@ -109,16 +110,28 @@ function readTab(ss, tabName) {
       closeDate = isNaN(parsed) ? String(rawDate).trim() : Utilities.formatDate(parsed, tz, 'yyyy-MM-dd');
     }
 
-    deals.push({
-      id:               C.DEAL_ID >= 0 ? String(row[C.DEAL_ID] || 'row-' + i) : 'row-' + i,
-      company:          company,
-      owner:            C.DEAL_OWNER >= 0 ? String(row[C.DEAL_OWNER] || '').trim() : '',
-      value:            value,
-      stage:            C.PIPELINE_STAGE >= 0 ? String(row[C.PIPELINE_STAGE] || '').trim() : '',
-      forecastCategory: forecastCategory,
-      closeDate:        closeDate,
-      area:             area
-    });
+    var nbSplit = parseSplit(C.NB_SPLIT >= 0 ? row[C.NB_SPLIT] : null);
+    var csSplit = parseSplit(C.CS_SPLIT >= 0 ? row[C.CS_SPLIT] : null);
+
+    var base = { company: company, owner: owner, stage: stage, forecastCategory: forecastCategory, closeDate: closeDate };
+
+    if (pipeline === 'Resellers') {
+      // Resellers: NB Split holds the reseller value (falls back to full Amount)
+      var rValue = nbSplit || parseSplit(C.AMOUNT >= 0 ? row[C.AMOUNT] : null);
+      if (rValue > 0) {
+        deals.push(Object.assign({}, base, { id: dealId, value: rValue, area: 'resellers' }));
+      }
+    } else {
+      // NB Split > 0 → New Business tab
+      if (nbSplit > 0) {
+        deals.push(Object.assign({}, base, { id: dealId + '-nb', value: nbSplit, area: 'new-business' }));
+      }
+      // CS Split > 0 → Customer Success tab (same deal can appear in both)
+      if (csSplit > 0) {
+        deals.push(Object.assign({}, base, { id: dealId + '-cs', value: csSplit, area: 'customer-success' }));
+      }
+    }
   }
+
   return deals;
 }
