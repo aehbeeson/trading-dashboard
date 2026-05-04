@@ -28,15 +28,19 @@ function pct(p: number) {
   return Math.round(p * 100) + '%';
 }
 
-type SortKey = 'amount' | 'date-asc' | 'date-desc' | 'forecast';
+type SortKey = 'amount' | 'date-asc' | 'date-desc' | 'forecast' | 'forecast-amount';
 
 function sortDeals(deals: Deal[], key: SortKey): Deal[] {
   const copy = [...deals];
   switch (key) {
-    case 'amount':    return copy.sort((a, b) => b.value - a.value);
-    case 'date-asc':  return copy.sort((a, b) => (a.closeDate ?? '').localeCompare(b.closeDate ?? ''));
-    case 'date-desc': return copy.sort((a, b) => (b.closeDate ?? '').localeCompare(a.closeDate ?? ''));
-    case 'forecast':  return copy.sort((a, b) => (FC_ORDER[b.forecastCategory] ?? 0) - (FC_ORDER[a.forecastCategory] ?? 0));
+    case 'amount':         return copy.sort((a, b) => b.value - a.value);
+    case 'date-asc':       return copy.sort((a, b) => (a.closeDate ?? '').localeCompare(b.closeDate ?? ''));
+    case 'date-desc':      return copy.sort((a, b) => (b.closeDate ?? '').localeCompare(a.closeDate ?? ''));
+    case 'forecast':       return copy.sort((a, b) => (FC_ORDER[b.forecastCategory] ?? 0) - (FC_ORDER[a.forecastCategory] ?? 0));
+    case 'forecast-amount':return copy.sort((a, b) => {
+      const fc = (FC_ORDER[b.forecastCategory] ?? 0) - (FC_ORDER[a.forecastCategory] ?? 0);
+      return fc !== 0 ? fc : b.value - a.value;
+    });
   }
 }
 
@@ -104,10 +108,11 @@ function Section({ title, deals, headerBg, headerText, defaultOpen, sortKey }: S
 }
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'amount',    label: 'Amount'             },
-  { key: 'date-asc',  label: 'Close Date (soon)'  },
-  { key: 'date-desc', label: 'Close Date (latest)'},
-  { key: 'forecast',  label: 'Forecast'           },
+  { key: 'amount',          label: 'Amount'                    },
+  { key: 'date-asc',        label: 'Close Date (Nearest)'      },
+  { key: 'date-desc',       label: 'Close Date (Furthest)'     },
+  { key: 'forecast',        label: 'Forecast Category'         },
+  { key: 'forecast-amount', label: 'Forecast Category + Amount'},
 ];
 
 export default function ResultsView({ deals }: ResultsViewProps) {
