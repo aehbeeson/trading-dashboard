@@ -1,9 +1,13 @@
-import { SheetData } from './types';
+import { Deal } from './types';
 import { thisWeekDeals, lastWeekDeals } from './mockData';
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwchrLZsUlIAHCVm7bV3orxCXHzxnodFeoDl3svh4jQNUFje6bz2KwtuySdV0mgVKl0Lg/exec';
 
-export type { SheetData };
+export interface SheetData {
+  thisWeek: Deal[];
+  lastWeek: Deal[];
+  fetchedAt: string;
+}
 
 export async function fetchDashboardData(): Promise<SheetData> {
   try {
