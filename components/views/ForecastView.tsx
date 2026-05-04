@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Deal, AreaKey, SDForecastEntry, PeriodForecast } from '@/lib/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -8,47 +8,33 @@ import { Deal, AreaKey, SDForecastEntry, PeriodForecast } from '@/lib/types';
 function localISO(y: number, m: number, d: number) {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
-
 function monthRange(): [string, string] {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth() + 1;
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth() + 1;
   return [localISO(y, m, 1), localISO(y, m, new Date(y, m, 0).getDate())];
 }
-
 function quarterRange(): [string, string] {
-  const now = new Date();
-  const y = now.getFullYear();
-  const qStart = Math.floor(now.getMonth() / 3) * 3 + 1;
-  const qEnd   = qStart + 2;
-  return [localISO(y, qStart, 1), localISO(y, qEnd, new Date(y, qEnd, 0).getDate())];
+  const now = new Date(), y = now.getFullYear();
+  const qs = Math.floor(now.getMonth() / 3) * 3 + 1, qe = qs + 2;
+  return [localISO(y, qs, 1), localISO(y, qe, new Date(y, qe, 0).getDate())];
 }
-
 function filterByDate(deals: Deal[], from: string, to: string) {
   return deals.filter(d => {
-    const dt = d.closeDate ? d.closeDate.substring(0, 10) : '';
+    const dt = d.closeDate?.substring(0, 10) ?? '';
     if (!dt) return true;
     if (from && dt < from) return false;
     if (to   && dt > to)   return false;
     return true;
   });
 }
-
 function fmtK(v: number) {
-  if (v === 0) return '-';
-  return '£' + Math.round(v / 1000) + 'k';
-}
-
-function fmtKRaw(v: number) {
-  return '£' + Math.round(v / 1000) + 'k';
+  return v === 0 ? '—' : '£' + Math.round(v / 1000) + 'k';
 }
 
 // ─── Pipeline calculation ────────────────────────────────────────────────────
 
 type RowKey = 'closedWon' | 'commit' | 'bestCase' | 'pipeline' | 'omitted';
 
-interface PipelineCalc extends Record<RowKey, number> {
-  total: number;
-}
+interface PipelineCalc extends Record<RowKey, number> { total: number; }
 
 function calcPipeline(deals: Deal[]): PipelineCalc {
   const closedWon = deals.filter(d => d.probability >= 0.99).reduce((s, d) => s + d.value, 0);
@@ -59,9 +45,7 @@ function calcPipeline(deals: Deal[]): PipelineCalc {
   return { closedWon, commit, bestCase, pipeline, omitted, total: closedWon + commit + bestCase + pipeline + omitted };
 }
 
-// ─── SD Forecast state ───────────────────────────────────────────────────────
-
-const EMPTY_PERIOD: PeriodForecast = { closedWon: 0, commit: 0, bestCase: 0, pipeline: 0, omitted: 0 };
+// ─── State types ─────────────────────────────────────────────────────────────
 
 interface SDForecast {
   month:      PeriodForecast;
@@ -70,45 +54,39 @@ interface SDForecast {
   otherDeals: string;
 }
 
-const EMPTY_FORECAST: SDForecast = {
-  month:      { ...EMPTY_PERIOD },
-  quarter:    { ...EMPTY_PERIOD },
-  mainDeals:  '',
-  otherDeals: '',
-};
+const EMPTY_PERIOD: PeriodForecast = { closedWon: 0, commit: 0, bestCase: 0, pipeline: 0, omitted: 0 };
+const EMPTY_FORECAST: SDForecast   = { month: { ...EMPTY_PERIOD }, quarter: { ...EMPTY_PERIOD }, mainDeals: '', otherDeals: '' };
 
-const ROWS: Array<{ key: RowKey; label: string; won?: boolean }> = [
-  { key: 'closedWon', label: 'Closed Won',    won: true },
-  { key: 'commit',    label: 'Commit'                   },
-  { key: 'bestCase',  label: 'Best Case'                },
-  { key: 'pipeline',  label: 'Pipeline'                 },
-  { key: 'omitted',   label: 'Not Forecasted'           },
+const ROWS: Array<{ key: RowKey; label: string; readOnly?: boolean }> = [
+  { key: 'closedWon', label: 'Closed Won',    readOnly: true },
+  { key: 'commit',    label: 'Commit'                        },
+  { key: 'bestCase',  label: 'Best Case'                     },
+  { key: 'pipeline',  label: 'Pipeline'                      },
+  { key: 'omitted',   label: 'Not Forecasted'                },
 ];
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── £k input ────────────────────────────────────────────────────────────────
 
-function SDInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [raw, setRaw] = useState(value > 0 ? String(Math.round(value / 1000)) : '');
+function KInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [text, setText] = useState(value > 0 ? String(Math.round(value / 1000)) : '');
 
-  useEffect(() => {
-    setRaw(value > 0 ? String(Math.round(value / 1000)) : '');
-  }, [value]);
+  useEffect(() => { setText(value > 0 ? String(Math.round(value / 1000)) : ''); }, [value]);
 
   return (
-    <div className="flex items-center justify-end gap-0.5">
+    <div className="flex items-center justify-end gap-1">
       <span className="text-gray-400 text-xs select-none">£</span>
       <input
         type="number"
         min={0}
-        value={raw}
-        onChange={e => setRaw(e.target.value)}
+        value={text}
+        onChange={e => setText(e.target.value)}
         onBlur={() => {
-          const n = parseFloat(raw) || 0;
+          const n = parseFloat(text) || 0;
           onChange(Math.round(n * 1000));
-          setRaw(n > 0 ? String(n) : '');
+          setText(n > 0 ? String(n) : '');
         }}
         placeholder="—"
-        className="w-20 text-right border border-gray-200 rounded px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+        className="w-20 text-right border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 bg-white placeholder-gray-300"
       />
       <span className="text-gray-400 text-xs select-none">k</span>
     </div>
@@ -118,160 +96,190 @@ function SDInput({ value, onChange }: { value: number; onChange: (v: number) => 
 // ─── Main component ──────────────────────────────────────────────────────────
 
 interface ForecastViewProps {
-  deals: Deal[];      // all this-week deals for this area, unfiltered by global date
-  area: AreaKey;
-  accentColor: string;
+  deals:          Deal[];
+  area:           AreaKey;
+  accentColor:    string;
   serverForecast: SDForecastEntry | null;
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export default function ForecastView({ deals, area, accentColor, serverForecast }: ForecastViewProps) {
+  const [saved,     setSaved]     = useState<SDForecast>(EMPTY_FORECAST);
+  const [draft,     setDraft]     = useState<SDForecast>(EMPTY_FORECAST);
+  const [isDirty,   setIsDirty]   = useState(false);
+  const [isSaving,  setIsSaving]  = useState(false);
+  const [submitOk,  setSubmitOk]  = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [loaded,    setLoaded]    = useState(false);
 
-export default function ForecastView({ deals, area, serverForecast }: ForecastViewProps) {
-  const [sd, setSd]         = useState<SDForecast>(EMPTY_FORECAST);
-  const [loaded, setLoaded] = useState(false);
-  const [status, setStatus] = useState<SaveStatus>('idle');
-  const saveTimer           = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Initialise: prefer server data, fall back to localStorage
   useEffect(() => {
+    let initial = EMPTY_FORECAST;
     if (serverForecast) {
-      setSd({
-        month:      serverForecast.month,
-        quarter:    serverForecast.quarter,
-        mainDeals:  serverForecast.mainDeals,
-        otherDeals: serverForecast.otherDeals,
-      });
+      initial    = { month: serverForecast.month, quarter: serverForecast.quarter, mainDeals: serverForecast.mainDeals, otherDeals: serverForecast.otherDeals };
+      setLastSaved(serverForecast.updatedAt);
     } else {
-      try {
-        const raw = localStorage.getItem(`sdForecast_${area}`);
-        if (raw) setSd(JSON.parse(raw));
-      } catch {}
+      try { const raw = localStorage.getItem(`sdForecast_${area}`); if (raw) initial = JSON.parse(raw); } catch {}
     }
+    setSaved(initial);
+    setDraft(initial);
     setLoaded(true);
   }, [area, serverForecast]);
 
-  function save(next: SDForecast) {
-    setSd(next);
-    // Persist to localStorage immediately for instant local cache
-    try { localStorage.setItem(`sdForecast_${area}`, JSON.stringify(next)); } catch {}
+  function updateDraft(next: SDForecast) {
+    setDraft(next);
+    setIsDirty(true);
+    setSubmitOk(false);
+  }
 
-    // Debounce the server write by 800ms so rapid typing doesn't flood the API
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    setStatus('saving');
-    saveTimer.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/forecast', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ area, ...next }),
-        });
-        const json = await res.json();
-        setStatus(json.ok ? 'saved' : 'error');
-      } catch {
-        setStatus('error');
+  async function handleSubmit() {
+    setIsSaving(true);
+    try {
+      const res  = await fetch('/api/forecast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area, ...draft }) });
+      const json = await res.json();
+      if (json.ok !== false) {
+        setSaved(draft);
+        setIsDirty(false);
+        setSubmitOk(true);
+        const now = new Date().toISOString();
+        setLastSaved(now);
+        try { localStorage.setItem(`sdForecast_${area}`, JSON.stringify(draft)); } catch {}
+        setTimeout(() => setSubmitOk(false), 4000);
       }
-      setTimeout(() => setStatus('idle'), 3000);
-    }, 800);
+    } catch { /* network error — draft stays dirty */ }
+    setIsSaving(false);
   }
 
-  function setSDValue(period: 'month' | 'quarter', key: RowKey, value: number) {
-    save({ ...sd, [period]: { ...sd[period], [key]: value } });
-  }
-
-  function setComment(field: 'mainDeals' | 'otherDeals', value: string) {
-    save({ ...sd, [field]: value });
-  }
+  function discard() { setDraft(saved); setIsDirty(false); setSubmitOk(false); }
 
   const [mFrom, mTo] = monthRange();
   const [qFrom, qTo] = quarterRange();
-  const monthCalc   = calcPipeline(filterByDate(deals, mFrom, mTo));
-  const quarterCalc = calcPipeline(filterByDate(deals, qFrom, qTo));
+  const mCalc = calcPipeline(filterByDate(deals, mFrom, mTo));
+  const qCalc = calcPipeline(filterByDate(deals, qFrom, qTo));
 
-  const sdMonthTotal   = (Object.keys(EMPTY_PERIOD) as RowKey[]).reduce((s, k) => s + sd.month[k],   0);
-  const sdQuarterTotal = (Object.keys(EMPTY_PERIOD) as RowKey[]).reduce((s, k) => s + sd.quarter[k], 0);
+  // SD totals always use calculated closedWon (not stored) + entered values
+  const sdMTotal = mCalc.closedWon + draft.month.commit   + draft.month.bestCase   + draft.month.pipeline   + draft.month.omitted;
+  const sdQTotal = qCalc.closedWon + draft.quarter.commit + draft.quarter.bestCase + draft.quarter.pipeline + draft.quarter.omitted;
 
-  // Avoid hydration mismatch on localStorage reads
+  const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const qLabel     = `Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${new Date().getFullYear()}`;
+
   if (!loaded) return null;
 
-  const monthLabel   = new Date().toLocaleDateString('en-GB', { month: 'long' });
-  const quarterLabel = `Q${Math.ceil((new Date().getMonth() + 1) / 3)}`;
-
   return (
-    <div>
+    <div className="space-y-5">
+
+      {/* ── Action bar ── */}
+      <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-3.5">
+        <p className="text-sm text-gray-500">
+          {lastSaved
+            ? <>Last submitted <span className="text-slate-700 font-medium">{new Date(lastSaved).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>
+            : <span className="text-gray-400">No submission yet</span>
+          }
+        </p>
+        <div className="flex items-center gap-3">
+          {submitOk && !isDirty && (
+            <span className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              Submitted to Google Sheets
+            </span>
+          )}
+          {isDirty && (
+            <>
+              <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+                Unsaved changes
+              </span>
+              <button onClick={discard} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                Discard
+              </button>
+            </>
+          )}
+          <button
+            onClick={handleSubmit}
+            disabled={!isDirty || isSaving}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              isDirty
+                ? 'bg-slate-900 text-white hover:bg-slate-700 shadow-sm'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {isSaving ? 'Submitting…' : 'Submit Forecast'}
+          </button>
+        </div>
+      </div>
+
       {/* ── Forecast table ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white text-xs">
-                <th className="px-5 py-3 text-left font-semibold w-44" />
-
-                {/* Month section */}
-                <th className="px-4 py-3 text-right font-semibold">
-                  <span className="underline">{monthLabel} Pipeline View</span>
+              <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
+                <th className="px-5 py-3.5 text-left font-semibold w-44 text-xs uppercase tracking-wide">Category</th>
+                <th className="px-4 py-3.5 text-right font-semibold text-xs">
+                  {monthLabel}<br /><span className="font-normal opacity-60 text-xs">Pipeline View</span>
                 </th>
-                <th className="px-4 py-3 text-right font-semibold">SD Forecast</th>
-
-                {/* Visual gap */}
-                <th className="w-4 bg-slate-700" />
-
-                {/* Quarter section */}
-                <th className="px-4 py-3 text-right font-semibold">
-                  <span className="underline">{quarterLabel} Pipeline View</span>
+                <th className="px-4 py-3.5 text-right font-semibold text-xs">
+                  SD Forecast
                 </th>
-                <th className="px-4 py-3 text-right font-semibold">SD Forecast</th>
+                <th className="w-3 bg-slate-700/50" />
+                <th className="px-4 py-3.5 text-right font-semibold text-xs">
+                  {qLabel}<br /><span className="font-normal opacity-60 text-xs">Pipeline View</span>
+                </th>
+                <th className="px-4 py-3.5 text-right font-semibold text-xs">
+                  SD Forecast
+                </th>
               </tr>
             </thead>
 
             <tbody>
-              {ROWS.map(row => (
-                <tr
-                  key={row.key}
-                  className={`border-t border-gray-100 ${row.won ? 'bg-green-50' : 'hover:bg-gray-50'}`}
-                >
-                  <td className={`px-5 py-3 font-semibold ${row.won ? 'text-emerald-800' : 'text-slate-700'}`}>
-                    {row.label}
-                  </td>
+              {ROWS.map((row, i) => {
+                const isWon = row.readOnly;
+                const base  = isWon ? 'bg-emerald-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+                return (
+                  <tr key={row.key} className={`border-t border-gray-100 ${base}`}>
+                    <td className={`px-5 py-3 font-semibold ${isWon ? 'text-emerald-700' : 'text-slate-700'}`}>
+                      {row.label}
+                      {isWon && <span className="ml-2 text-xs font-normal text-emerald-500 opacity-75">calculated</span>}
+                    </td>
 
-                  {/* Month pipeline (calculated) */}
-                  <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                    {fmtK(monthCalc[row.key])}
-                  </td>
+                    {/* Month pipeline */}
+                    <td className={`px-4 py-3 text-right font-medium tabular-nums ${isWon ? 'text-emerald-700' : 'text-slate-700'}`}>
+                      {fmtK(mCalc[row.key])}
+                    </td>
 
-                  {/* Month SD input */}
-                  <td className="px-4 py-2.5 text-right">
-                    <SDInput
-                      value={sd.month[row.key]}
-                      onChange={v => setSDValue('month', row.key, v)}
-                    />
-                  </td>
+                    {/* Month SD */}
+                    <td className="px-4 py-2.5 text-right">
+                      {isWon
+                        ? <span className="text-emerald-700 font-medium tabular-nums">{fmtK(mCalc.closedWon)}</span>
+                        : <KInput value={draft.month[row.key]} onChange={v => updateDraft({ ...draft, month: { ...draft.month, [row.key]: v } })} />
+                      }
+                    </td>
 
-                  <td className="bg-slate-100" />
+                    <td className="w-3 bg-gray-100" />
 
-                  {/* Quarter pipeline (calculated) */}
-                  <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                    {fmtK(quarterCalc[row.key])}
-                  </td>
+                    {/* Quarter pipeline */}
+                    <td className={`px-4 py-3 text-right font-medium tabular-nums ${isWon ? 'text-emerald-700' : 'text-slate-700'}`}>
+                      {fmtK(qCalc[row.key])}
+                    </td>
 
-                  {/* Quarter SD input */}
-                  <td className="px-4 py-2.5 text-right">
-                    <SDInput
-                      value={sd.quarter[row.key]}
-                      onChange={v => setSDValue('quarter', row.key, v)}
-                    />
-                  </td>
-                </tr>
-              ))}
+                    {/* Quarter SD */}
+                    <td className="px-4 py-2.5 text-right">
+                      {isWon
+                        ? <span className="text-emerald-700 font-medium tabular-nums">{fmtK(qCalc.closedWon)}</span>
+                        : <KInput value={draft.quarter[row.key]} onChange={v => updateDraft({ ...draft, quarter: { ...draft.quarter, [row.key]: v } })} />
+                      }
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
 
             <tfoot>
-              <tr className="border-t-2 border-yellow-400 bg-yellow-300 font-bold text-slate-900">
-                <td className="px-5 py-3">Total</td>
-                <td className="px-4 py-3 text-right">{fmtKRaw(monthCalc.total)}</td>
-                <td className="px-4 py-3 text-right">{fmtKRaw(sdMonthTotal)}</td>
-                <td className="bg-yellow-200" />
-                <td className="px-4 py-3 text-right">{fmtKRaw(quarterCalc.total)}</td>
-                <td className="px-4 py-3 text-right">{fmtKRaw(sdQuarterTotal)}</td>
+              <tr className="border-t-2 border-gray-200 bg-gray-50">
+                <td className="px-5 py-3.5 font-bold text-slate-800 text-sm">Total</td>
+                <td className="px-4 py-3.5 text-right font-bold text-slate-800 tabular-nums">{fmtK(mCalc.total)}</td>
+                <td className="px-4 py-3.5 text-right font-bold tabular-nums" style={{ color: accentColor }}>{fmtK(sdMTotal)}</td>
+                <td className="bg-gray-100" />
+                <td className="px-4 py-3.5 text-right font-bold text-slate-800 tabular-nums">{fmtK(qCalc.total)}</td>
+                <td className="px-4 py-3.5 text-right font-bold tabular-nums" style={{ color: accentColor }}>{fmtK(sdQTotal)}</td>
               </tr>
             </tfoot>
           </table>
@@ -280,38 +288,23 @@ export default function ForecastView({ deals, area, serverForecast }: ForecastVi
 
       {/* ── Comments ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-bold text-slate-800 mb-3">Main {monthLabel} Deals</h3>
-          <textarea
-            value={sd.mainDeals}
-            onChange={e => setComment('mainDeals', e.target.value)}
-            placeholder={"• Company €40K: chosen provider, working on signature.\n• Company €25K: decision meeting tomorrow."}
-            rows={7}
-            className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-700 placeholder-gray-300 leading-relaxed"
-          />
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-bold text-slate-800 mb-3">Other Main Deals</h3>
-          <textarea
-            value={sd.otherDeals}
-            onChange={e => setComment('otherDeals', e.target.value)}
-            placeholder={"• Company €160K: currently in eval stage, engaging with L&D Manager.\n• Company €85K: RfI submitted, awaiting RfP launch."}
-            rows={7}
-            className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-700 placeholder-gray-300 leading-relaxed"
-          />
-        </div>
+        {[
+          { field: 'mainDeals'  as const, title: `Main ${new Date().toLocaleDateString('en-GB', { month: 'long' })} Deals`,  placeholder: '• Company €40K: chosen provider, working on signature.\n• Company €25K: decision meeting tomorrow.' },
+          { field: 'otherDeals' as const, title: 'Other Main Deals', placeholder: '• Company €160K: currently in eval stage.\n• Company €85K: RfI submitted, awaiting RfP launch.' },
+        ].map(({ field, title, placeholder }) => (
+          <div key={field} className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="font-semibold text-slate-800 mb-3 text-sm">{title}</h3>
+            <textarea
+              value={draft[field]}
+              onChange={e => updateDraft({ ...draft, [field]: e.target.value })}
+              placeholder={placeholder}
+              rows={7}
+              className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 text-gray-700 placeholder-gray-300 leading-relaxed"
+            />
+          </div>
+        ))}
       </div>
 
-      <div className="mt-3 flex justify-end items-center gap-2 text-xs">
-        {status === 'saving' && <span className="text-gray-400">Saving to Google Sheets…</span>}
-        {status === 'saved'  && <span className="text-emerald-600">Saved to Google Sheets</span>}
-        {status === 'error'  && <span className="text-red-500">Save failed — changes kept locally</span>}
-        {serverForecast?.updatedAt && status === 'idle' && (
-          <span className="text-gray-400">
-            Last saved {new Date(serverForecast.updatedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-          </span>
-        )}
-      </div>
     </div>
   );
 }
