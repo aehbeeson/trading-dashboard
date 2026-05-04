@@ -184,7 +184,13 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col />
+            <col style={{ width: '130px' }} />
+            <col style={{ width: '150px' }} />
+            <col style={{ width: '150px' }} />
+          </colgroup>
           <thead>
             <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
               <th className="px-5 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Area</th>
