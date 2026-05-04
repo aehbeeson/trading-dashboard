@@ -37,10 +37,10 @@ function getOrCreateForecastSheet(ss) {
   if (!sheet) {
     sheet = ss.insertSheet('SD Forecast');
     sheet.getRange(1, 1, 1, 14).setValues([[
-      'Area',
+      'SubmittedAt', 'Area',
       'Month_ClosedWon', 'Month_Commit', 'Month_BestCase', 'Month_Pipeline', 'Month_Omitted',
       'Qtr_ClosedWon',   'Qtr_Commit',   'Qtr_BestCase',   'Qtr_Pipeline',   'Qtr_Omitted',
-      'MainDeals', 'OtherDeals', 'UpdatedAt'
+      'MainDeals', 'OtherDeals'
     ]]);
   }
   return sheet;
@@ -51,28 +51,19 @@ function handleSaveForecast(encodedData) {
     var data = JSON.parse(decodeURIComponent(encodedData));
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = getOrCreateForecastSheet(ss);
-    var all   = sheet.getDataRange().getValues();
 
-    // Find existing row for this area (skip header row 0)
-    var rowIdx = -1;
-    for (var i = 1; i < all.length; i++) {
-      if (String(all[i][0]).trim() === String(data.area).trim()) {
-        rowIdx = i + 1; // 1-indexed for setRange
-        break;
-      }
-    }
-    if (rowIdx === -1) rowIdx = all.length + 1; // append
-
+    // Always append — the full history is kept as a log.
+    // readSDForecast picks the most recent row per area when displaying.
     var m = data.month   || {};
     var q = data.quarter || {};
-    sheet.getRange(rowIdx, 1, 1, 14).setValues([[
-      data.area,
+    sheet.appendRow([
+      new Date().toISOString(),
+      String(data.area).trim(),
       Number(m.closedWon) || 0, Number(m.commit) || 0, Number(m.bestCase) || 0, Number(m.pipeline) || 0, Number(m.omitted) || 0,
       Number(q.closedWon) || 0, Number(q.commit) || 0, Number(q.bestCase) || 0, Number(q.pipeline) || 0, Number(q.omitted) || 0,
       String(data.mainDeals  || ''),
       String(data.otherDeals || ''),
-      new Date().toISOString()
-    ]]);
+    ]);
 
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
@@ -90,29 +81,38 @@ function readSDForecast(ss) {
   var rows = sheet.getDataRange().getValues();
   if (rows.length < 2) return [];
 
-  var result = [];
+  // Rows are appended chronologically. Walk forward so the last entry
+  // for each area wins — that becomes the "current" forecast.
+  var latest = {}; // area → row
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
-    if (!r[0]) continue;
+    var area = String(r[1] || '').trim();
+    if (!area) continue;
+    latest[area] = r; // later rows overwrite earlier ones
+  }
+
+  var result = [];
+  for (var key in latest) {
+    var r = latest[key];
     result.push({
-      area: String(r[0]).trim(),
+      area: key,
       month: {
-        closedWon: Number(r[1])  || 0,
-        commit:    Number(r[2])  || 0,
-        bestCase:  Number(r[3])  || 0,
-        pipeline:  Number(r[4])  || 0,
-        omitted:   Number(r[5])  || 0,
+        closedWon: Number(r[2])  || 0,
+        commit:    Number(r[3])  || 0,
+        bestCase:  Number(r[4])  || 0,
+        pipeline:  Number(r[5])  || 0,
+        omitted:   Number(r[6])  || 0,
       },
       quarter: {
-        closedWon: Number(r[6])  || 0,
-        commit:    Number(r[7])  || 0,
-        bestCase:  Number(r[8])  || 0,
-        pipeline:  Number(r[9])  || 0,
-        omitted:   Number(r[10]) || 0,
+        closedWon: Number(r[7])  || 0,
+        commit:    Number(r[8])  || 0,
+        bestCase:  Number(r[9])  || 0,
+        pipeline:  Number(r[10]) || 0,
+        omitted:   Number(r[11]) || 0,
       },
-      mainDeals:  String(r[11] || ''),
-      otherDeals: String(r[12] || ''),
-      updatedAt:  String(r[13] || ''),
+      mainDeals:  String(r[12] || ''),
+      otherDeals: String(r[13] || ''),
+      updatedAt:  String(r[0]  || ''), // SubmittedAt timestamp
     });
   }
   return result;
