@@ -187,9 +187,9 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
         <table className="w-full text-sm table-fixed">
           <colgroup>
             <col />
-            <col style={{ width: '130px' }} />
-            <col style={{ width: '150px' }} />
-            <col style={{ width: '150px' }} />
+            <col style={{ width: '170px' }} />
+            <col style={{ width: '170px' }} />
+            <col style={{ width: '170px' }} />
           </colgroup>
           <thead>
             <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
