@@ -1,4 +1,4 @@
-export type AreaKey = 'new-business' | 'customer-success' | 'resellers' | 'guild';
+export type AreaKey = 'new-business' | 'customer-success' | 'resellers' | 'guild' | 'partnerships';
 
 export interface PeriodForecast {
   closedWon: number;
@@ -69,6 +69,7 @@ export const AREAS: AreaConfig[] = [
   { key: 'customer-success', label: 'Customer Success', accentColor: '#10B981', bgLight: 'bg-emerald-50', borderColor: 'border-emerald-200' },
   { key: 'resellers',        label: 'Resellers',        accentColor: '#8B5CF6', bgLight: 'bg-purple-50',  borderColor: 'border-purple-200'  },
   { key: 'guild',            label: 'Guild',            accentColor: '#F59E0B', bgLight: 'bg-amber-50',   borderColor: 'border-amber-200'   },
+  { key: 'partnerships',    label: 'Partnerships',    accentColor: '#EC4899', bgLight: 'bg-pink-50',    borderColor: 'border-pink-200'    },
 ];
 
 export const SUB_TABS: { key: SubTabKey; label: string }[] = [
