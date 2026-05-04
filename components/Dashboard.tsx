@@ -22,25 +22,28 @@ function localISO(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function monthRange(): [string, string] {
+function monthRange(offsetMonths = 0): [string, string] {
   const now  = new Date();
-  const y    = now.getFullYear();
-  const m    = now.getMonth() + 1; // 1-based
+  const d    = new Date(now.getFullYear(), now.getMonth() - offsetMonths, 1);
+  const y    = d.getFullYear();
+  const m    = d.getMonth() + 1;
   const last = new Date(y, m, 0).getDate();
   return [localISO(y, m, 1), localISO(y, m, last)];
 }
 
-function quarterRange(): [string, string] {
-  const now      = new Date();
-  const y        = now.getFullYear();
-  const qStart   = Math.floor(now.getMonth() / 3) * 3 + 1; // 1-based start month
-  const qEnd     = qStart + 2;
-  const lastDay  = new Date(y, qEnd, 0).getDate();
-  return [localISO(y, qStart, 1), localISO(y, qEnd, lastDay)];
+function quarterRange(offsetQuarters = 0): [string, string] {
+  const now    = new Date();
+  let   y      = now.getFullYear();
+  let   q      = Math.ceil((now.getMonth() + 1) / 3) - offsetQuarters;
+  while (q <= 0) { q += 4; y--; }
+  const qStart = (q - 1) * 3 + 1;
+  const qEnd   = q * 3;
+  const last   = new Date(y, qEnd, 0).getDate();
+  return [localISO(y, qStart, 1), localISO(y, qEnd, last)];
 }
 
-function yearRange(): [string, string] {
-  const y = new Date().getFullYear();
+function yearRange(offsetYears = 0): [string, string] {
+  const y = new Date().getFullYear() - offsetYears;
   return [localISO(y, 1, 1), localISO(y, 12, 31)];
 }
 
@@ -73,32 +76,46 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
     setActiveSubTab('results');
   }
 
-  function applyPreset(preset: 'month' | 'quarter' | 'year') {
-    if (preset === 'month')   { const [f, t] = monthRange();   setFilterFrom(f); setFilterTo(t); }
-    if (preset === 'quarter') { const [f, t] = quarterRange(); setFilterFrom(f); setFilterTo(t); }
-    if (preset === 'year')    { const [f, t] = yearRange();    setFilterFrom(f); setFilterTo(t); }
+  const [openDropdown, setOpenDropdown] = useState<'month' | 'quarter' | 'year' | null>(null);
+
+  const now = new Date();
+
+  // Build option lists
+  const monthOptions = Array.from({ length: 7 }, (_, i) => {
+    const [f, t] = monthRange(i);
+    const d      = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label  = i === 0 ? 'This Month' : d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    return { label, from: f, to: t };
+  });
+
+  const quarterOptions = Array.from({ length: 5 }, (_, i) => {
+    const [f, t] = quarterRange(i);
+    let   y      = now.getFullYear();
+    let   q      = Math.ceil((now.getMonth() + 1) / 3) - i;
+    while (q <= 0) { q += 4; y--; }
+    const label  = i === 0 ? 'This Quarter' : `Q${q} ${y}`;
+    return { label, from: f, to: t };
+  });
+
+  const yearOptions = Array.from({ length: 4 }, (_, i) => {
+    const [f, t] = yearRange(i);
+    const label  = i === 0 ? 'This Year' : String(now.getFullYear() - i);
+    return { label, from: f, to: t };
+  });
+
+  function applyRange(from: string, to: string) {
+    setFilterFrom(from);
+    setFilterTo(to);
+    setOpenDropdown(null);
   }
 
-  const [mFrom, mTo] = monthRange();
-  const [qFrom, qTo] = quarterRange();
-  const [yFrom, yTo] = yearRange();
-  const isMonth   = filterFrom === mFrom && filterTo === mTo;
-  const isQuarter = filterFrom === qFrom && filterTo === qTo;
-  const isYear    = filterFrom === yFrom && filterTo === yTo;
-  const isCustom  = !isMonth && !isQuarter && !isYear;
+  // Determine which preset (if any) is active, for button label
+  const activeMonth   = monthOptions.find(o => o.from === filterFrom && o.to === filterTo);
+  const activeQuarter = quarterOptions.find(o => o.from === filterFrom && o.to === filterTo);
+  const activeYear    = yearOptions.find(o => o.from === filterFrom && o.to === filterTo);
+  const isCustom      = !activeMonth && !activeQuarter && !activeYear;
 
   const fetchTime = new Date(fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-  const presetBtn = (label: string, active: boolean, onClick: () => void) => (
-    <button
-      onClick={onClick}
-      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-        active ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
-      }`}
-    >
-      {label}
-    </button>
-  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,12 +127,51 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
             <h1 className="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
           </div>
 
-          {/* Quick presets */}
-          <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1">
-            {presetBtn('This Month',   isMonth,   () => applyPreset('month'))}
-            {presetBtn('This Quarter', isQuarter, () => applyPreset('quarter'))}
-            {presetBtn('This Year',    isYear,    () => applyPreset('year'))}
-            {isCustom && presetBtn('Custom', true, () => {})}
+          {/* Quick presets with dropdowns */}
+          {openDropdown && (
+            <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
+          )}
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1 relative z-20">
+            {(
+              [
+                { key: 'month'   as const, options: monthOptions,   active: activeMonth   },
+                { key: 'quarter' as const, options: quarterOptions,  active: activeQuarter },
+                { key: 'year'    as const, options: yearOptions,     active: activeYear    },
+              ] as const
+            ).map(({ key, options, active }) => (
+              <div key={key} className="relative">
+                <button
+                  onClick={() => setOpenDropdown(o => o === key ? null : key)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                    active ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {active ? active.label : options[0].label}
+                  <span className="opacity-50 text-[10px]">▾</span>
+                </button>
+                {openDropdown === key && (
+                  <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px]">
+                    {options.map((o, i) => (
+                      <button
+                        key={o.from}
+                        onClick={() => applyRange(o.from, o.to)}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center justify-between gap-3 ${
+                          o.from === filterFrom && o.to === filterTo
+                            ? 'text-white font-semibold bg-slate-700'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                        } ${i === 0 ? 'border-b border-slate-700 mb-0.5' : ''}`}
+                      >
+                        {o.label}
+                        {o.from === filterFrom && o.to === filterTo && <span className="text-[10px] opacity-60">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {isCustom && (
+              <span className="px-2.5 py-1 rounded text-xs font-medium bg-white text-slate-900">Custom</span>
+            )}
           </div>
 
           {/* Date inputs */}
