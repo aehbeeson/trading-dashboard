@@ -89,12 +89,12 @@ function Section({ title, deals, headerBg, headerText, defaultOpen, sortKey }: S
             <tr key={deal.id} className={`hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
               <td className="px-5 py-2.5 font-medium text-slate-800 truncate max-w-0" title={deal.company}>{deal.company}</td>
               <td className="px-5 py-2.5 text-right text-gray-600 truncate max-w-0" title={deal.owner}>{deal.owner}</td>
-              <td className="px-5 py-2.5 text-right">
+              <td className="px-5 py-2.5 text-right hidden md:table-cell">
                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${FORECAST_BADGE[deal.forecastCategory]}`}>
                   {deal.forecastCategory}
                 </span>
               </td>
-              <td className="px-5 py-2.5 text-right text-gray-500">{pct(deal.probability)}</td>
+              <td className="px-5 py-2.5 text-right text-gray-500 hidden lg:table-cell">{pct(deal.probability)}</td>
               <td className="px-5 py-2.5 text-right font-semibold text-slate-800">{fmt(deal.value)}</td>
               <td className="px-5 py-2.5 text-right text-gray-500">{fmtDate(deal.closeDate)}</td>
             </tr>
@@ -170,17 +170,17 @@ export default function ResultsView({ deals }: ResultsViewProps) {
             <colgroup>
               <col />
               <col style={{ width: '150px' }} />
-              <col style={{ width: '150px' }} />
-              <col style={{ width: '150px' }} />
+              <col className="hidden md:table-column" style={{ width: '150px' }} />
+              <col className="hidden lg:table-column" style={{ width: '150px' }} />
               <col style={{ width: '150px' }} />
               <col style={{ width: '150px' }} />
             </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white text-xs uppercase tracking-wide">
-                <th className="px-5 py-2.5 text-left font-semibold">Company</th>
+                <th className="px-5 py-2.5 text-left font-semibold" style={{ minWidth: '150px' }}>Company</th>
                 <th className="px-5 py-2.5 text-right font-semibold">Owner</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Forecast</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Probability</th>
+                <th className="px-5 py-2.5 text-right font-semibold hidden md:table-cell">Forecast</th>
+                <th className="px-5 py-2.5 text-right font-semibold hidden lg:table-cell">Probability</th>
                 <th className="px-5 py-2.5 text-right font-semibold">ARR</th>
                 <th className="px-5 py-2.5 text-right font-semibold">Close Date</th>
               </tr>

@@ -120,75 +120,76 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-slate-900 text-white shadow-lg">
-        <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-screen-xl mx-auto px-6 py-4 flex flex-wrap items-center gap-4">
           <div className="flex-1 flex flex-col gap-1 pt-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/busuu-logo.png" alt="Busuu" className="h-8 w-auto self-start" />
             <h1 className="text-xl font-bold tracking-tight">B2B Trading Dashboard</h1>
           </div>
 
-          {/* Quick presets + date inputs — hidden on Overview */}
+          {/* Quick presets + date inputs — hidden on Overview, wraps to second row on small screens */}
           {activeArea !== 'summary' && openDropdown && (
             <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
           )}
-          {activeArea !== 'summary' && <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1 relative z-20">
-            {(
-              [
-                { key: 'month'   as const, options: monthOptions,   active: activeMonth   },
-                { key: 'quarter' as const, options: quarterOptions,  active: activeQuarter },
-                { key: 'year'    as const, options: yearOptions,     active: activeYear    },
-              ] as const
-            ).map(({ key, options, active }) => (
-              <div key={key} className="relative">
-                <button
-                  onClick={() => setOpenDropdown(o => o === key ? null : key)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    active ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {active ? active.label : options[0].label}
-                  <span className="opacity-50 text-[10px]">▾</span>
-                </button>
-                {openDropdown === key && (
-                  <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px]">
-                    {options.map((o, i) => (
-                      <button
-                        key={o.from}
-                        onClick={() => applyRange(o.from, o.to)}
-                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center justify-between gap-3 ${
-                          o.from === filterFrom && o.to === filterTo
-                            ? 'text-white font-semibold bg-slate-700'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                        } ${i === 0 ? 'border-b border-slate-700 mb-0.5' : ''}`}
-                      >
-                        {o.label}
-                        {o.from === filterFrom && o.to === filterTo && <span className="text-[10px] opacity-60">✓</span>}
-                      </button>
-                    ))}
+          {activeArea !== 'summary' && (
+            <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto order-last lg:order-none">
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-1 py-1 relative z-20">
+                {(
+                  [
+                    { key: 'month'   as const, options: monthOptions,   active: activeMonth   },
+                    { key: 'quarter' as const, options: quarterOptions,  active: activeQuarter },
+                    { key: 'year'    as const, options: yearOptions,     active: activeYear    },
+                  ] as const
+                ).map(({ key, options, active }) => (
+                  <div key={key} className="relative">
+                    <button
+                      onClick={() => setOpenDropdown(o => o === key ? null : key)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        active ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {active ? active.label : options[0].label}
+                      <span className="opacity-50 text-[10px]">▾</span>
+                    </button>
+                    {openDropdown === key && (
+                      <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px]">
+                        {options.map((o, i) => (
+                          <button
+                            key={o.from}
+                            onClick={() => applyRange(o.from, o.to)}
+                            className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center justify-between gap-3 ${
+                              o.from === filterFrom && o.to === filterTo
+                                ? 'text-white font-semibold bg-slate-700'
+                                : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                            } ${i === 0 ? 'border-b border-slate-700 mb-0.5' : ''}`}
+                          >
+                            {o.label}
+                            {o.from === filterFrom && o.to === filterTo && <span className="text-[10px] opacity-60">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                ))}
+                {isCustom && (
+                  <span className="px-2.5 py-1 rounded text-xs font-medium bg-white text-slate-900">Custom</span>
                 )}
               </div>
-            ))}
-            {isCustom && (
-              <span className="px-2.5 py-1 rounded text-xs font-medium bg-white text-slate-900">Custom</span>
-            )}
-          </div>}
-
-          {activeArea !== 'summary' && (
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={filterFrom}
-                onChange={e => setFilterFrom(e.target.value)}
-                className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
-              />
-              <span className="text-slate-500 text-xs">to</span>
-              <input
-                type="date"
-                value={filterTo}
-                onChange={e => setFilterTo(e.target.value)}
-                className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={filterFrom}
+                  onChange={e => setFilterFrom(e.target.value)}
+                  className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
+                />
+                <span className="text-slate-500 text-xs">to</span>
+                <input
+                  type="date"
+                  value={filterTo}
+                  onChange={e => setFilterTo(e.target.value)}
+                  className="text-sm bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-white"
+                />
+              </div>
             </div>
           )}
 
