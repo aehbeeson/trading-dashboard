@@ -20,11 +20,33 @@ function fmtDate(s: string) {
 }
 function sum(deals: Deal[]) { return deals.reduce((s, d) => s + d.value, 0); }
 
-// Parse "W YYYY" week label into a sortable integer (year * 100 + week)
 function parseWeekKey(s: string): number {
   const parts = s.trim().split(/\s+/);
   if (parts.length === 2) return (parseInt(parts[1]) || 0) * 100 + (parseInt(parts[0]) || 0);
   return parseInt(s) || 0;
+}
+
+interface Yoy { priorTotal: number; delta: number; pct: number }
+
+function calcYoy(current: number, prior: number | null): Yoy | null {
+  if (prior === null) return null;
+  const delta = current - prior;
+  const pct   = prior > 0 ? (delta / prior) * 100 : 0;
+  return { priorTotal: prior, delta, pct };
+}
+
+function YoyCell({ yoy, size = 'sm' }: { yoy: Yoy | null | undefined; size?: 'xs' | 'sm' }) {
+  if (!yoy) return <span className="text-gray-300 tabular-nums">—</span>;
+  const pos   = yoy.delta >= 0;
+  const color = pos ? 'text-emerald-600' : 'text-red-500';
+  const sign  = pos ? '+' : '';
+  const ts    = size === 'xs' ? 'text-xs' : 'text-sm';
+  return (
+    <span className={`${color} ${ts} tabular-nums font-medium`}>
+      {sign}{fmtK(yoy.delta)}{' '}
+      <span className="opacity-70 text-xs">({sign}{Math.round(yoy.pct)}%)</span>
+    </span>
+  );
 }
 
 // ─── Tree builders ────────────────────────────────────────────────────────────
@@ -55,6 +77,11 @@ function buildWeekMap(deals: Deal[]): Record<string, Deal[]> {
     (map[w] ??= []).push(d);
   }
   return map;
+}
+
+function yearDeals(tree: YearMap, y: number): Deal[] {
+  if (!tree[y]) return [];
+  return Object.values(tree[y]).flatMap(q => Object.values(q).flat());
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -96,40 +123,37 @@ function DealTable({ deals }: { deals: Deal[] }) {
   );
 }
 
-interface RowProps {
-  label: string;
-  count: number;
-  total: number;
-  depth: number;       // 0=year, 1=quarter, 2=month, 3=week
-  open: boolean;
-  onToggle: () => void;
+// Row inside a year card (quarter or month level)
+interface PeriodRowProps {
+  label:       string;
+  count:       number;
+  total:       number;
+  yoy:         Yoy | null;
+  depth:       1 | 2;   // 1=quarter, 2=month
+  open:        boolean;
+  onToggle:    () => void;
   accentColor: string;
 }
 
-function HierarchyRow({ label, count, total, depth, open, onToggle, accentColor }: RowProps) {
-  const pl      = [5, 10, 14, 5][depth] ?? 5;
-  const size    = depth === 0 ? 'text-base font-bold' : depth === 1 ? 'text-sm font-semibold' : 'text-sm font-medium';
-  const textCol = depth === 0 ? 'text-slate-800' : depth === 1 ? 'text-slate-700' : 'text-slate-600';
-  const bg      = depth === 0
-    ? 'hover:bg-gray-50'
-    : depth === 1 ? 'hover:bg-gray-50' : 'hover:bg-gray-50/60';
-  const borderLeft = depth === 0 ? `4px solid ${accentColor}` : depth === 1 ? `4px solid ${accentColor}40` : 'none';
-  const pyClass = depth <= 1 ? 'py-3.5' : 'py-2.5';
+function PeriodRow({ label, count, total, yoy, depth, open, onToggle, accentColor }: PeriodRowProps) {
+  const pl        = depth === 1 ? 5 : 10;
+  const size      = depth === 1 ? 'text-sm font-semibold text-slate-700' : 'text-sm font-medium text-slate-600';
+  const borderLeft = depth === 1 ? `4px solid ${accentColor}40` : 'none';
+  const pyClass   = depth === 1 ? 'py-3' : 'py-2.5';
 
   return (
     <button
       onClick={onToggle}
-      className={`w-full flex items-center justify-between pr-5 ${pyClass} ${bg} text-left transition-colors`}
+      className={`w-full flex items-center gap-4 pr-4 hover:bg-gray-50 text-left transition-colors ${pyClass}`}
       style={{ paddingLeft: `${pl * 4}px`, borderLeft }}
     >
-      <div className="flex items-center gap-3">
-        <span className={`${size} ${textCol}`}>{label}</span>
-        <span className="text-xs text-gray-400">{count} deal{count !== 1 ? 's' : ''}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className={`${size} ${textCol} tabular-nums`}>{fmtK(total)}</span>
-        <span className="text-gray-400 text-[10px] w-3">{open ? '▴' : '▾'}</span>
-      </div>
+      <span className={`${size} flex-1`}>{label}</span>
+      <span className="text-xs text-gray-400 w-16 text-right tabular-nums">{count} deal{count !== 1 ? 's' : ''}</span>
+      <span className={`${size} w-24 text-right tabular-nums`}>{fmtK(total)}</span>
+      <span className="w-44 text-right">
+        <YoyCell yoy={yoy} size="xs" />
+      </span>
+      <span className="text-gray-400 text-[10px] w-3">{open ? '▴' : '▾'}</span>
     </button>
   );
 }
@@ -162,13 +186,12 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
   const curY = now.getFullYear();
   const curQ = Math.ceil((now.getMonth() + 1) / 3);
 
-  const years    = useToggleSet<number>([curY]);
   const quarters = useToggleSet<string>([`${curY}-Q${curQ}`]);
   const months   = useToggleSet<string>([]);
   const weeks    = useToggleSet<string>([]);
 
-  const won    = deals.filter(d => d.probability >= 0.99);
-  const lost   = deals.filter(d => d.probability <= 0.01);
+  const won  = deals.filter(d => d.probability >= 0.99);
+  const lost = deals.filter(d => d.probability <= 0.01);
 
   const tree    = buildYearTree(won);
   const weekMap = buildWeekMap(won);
@@ -176,8 +199,8 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
   const yearKeys = Object.keys(tree).map(Number).sort((a, b) => b - a);
   const weekKeys = Object.keys(weekMap).sort((a, b) => parseWeekKey(b) - parseWeekKey(a));
 
-  const grandTotal  = sum(won);
-  const grandLost   = sum(lost);
+  const grandTotal = sum(won);
+  const grandLost  = sum(lost);
 
   return (
     <div className="space-y-5">
@@ -222,47 +245,91 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
         </div>
       </div>
 
-      {/* ── Period hierarchy view ── */}
+      {/* ── Period view — one card per year ── */}
       {view === 'period' && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="space-y-5">
           {yearKeys.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-gray-400">No Closed Won deals found.</p>
+            <div className="bg-white rounded-xl border border-gray-200 px-5 py-10 text-center text-sm text-gray-400">
+              No Closed Won deals found.
+            </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {yearKeys.map(y => {
-                const yOpen  = years.set.has(y);
-                const yDeals = Object.values(tree[y]).flatMap(q => Object.values(q).flat());
+            yearKeys.map(y => {
+              const priorY     = y - 1;
+              const yDeals     = yearDeals(tree, y);
+              const priorDeals = yearDeals(tree, priorY);
+              const yTotal     = sum(yDeals);
+              const priorTotal = priorDeals.length > 0 ? sum(priorDeals) : null;
+              const yoyYear    = calcYoy(yTotal, priorTotal);
 
-                return (
-                  <div key={y}>
-                    <HierarchyRow
-                      label={String(y)} count={yDeals.length} total={sum(yDeals)}
-                      depth={0} open={yOpen} accentColor={accentColor}
-                      onToggle={() => years.toggle(y)}
-                    />
+              return (
+                <div key={y} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
 
-                    {yOpen && Object.keys(tree[y]).map(Number).sort((a, b) => b - a).map(q => {
-                      const qKey   = `${y}-Q${q}`;
-                      const qOpen  = quarters.set.has(qKey);
-                      const qDeals = Object.values(tree[y][q]).flat();
+                  {/* Year header */}
+                  <div
+                    style={{ backgroundColor: '#1e3a5f' }}
+                    className="flex items-center gap-4 px-5 py-3.5 text-white"
+                  >
+                    <span className="text-base font-bold flex-1">{y}</span>
+                    <span className="text-xs text-slate-400 w-16 text-right tabular-nums">
+                      {yDeals.length} deal{yDeals.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-base font-bold w-24 text-right tabular-nums">{fmtK(yTotal)}</span>
+                    <span className="w-44 text-right">
+                      {yoyYear ? (
+                        <span className={`text-sm font-medium tabular-nums ${yoyYear.delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {yoyYear.delta >= 0 ? '+' : ''}{fmtK(yoyYear.delta)}{' '}
+                          <span className="opacity-75 text-xs">
+                            ({yoyYear.delta >= 0 ? '+' : ''}{Math.round(yoyYear.pct)}% vs {priorY})
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">no prior year data</span>
+                      )}
+                    </span>
+                    <span className="w-3" /> {/* spacer to align with toggle arrows below */}
+                  </div>
+
+                  {/* Column sub-header */}
+                  <div className="flex items-center gap-4 px-5 py-2 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                    <span className="flex-1">Period</span>
+                    <span className="w-16 text-right">Deals</span>
+                    <span className="w-24 text-right">Total</span>
+                    <span className="w-44 text-right">vs {priorY}</span>
+                    <span className="w-3" />
+                  </div>
+
+                  {/* Quarter / Month rows */}
+                  <div className="divide-y divide-gray-100">
+                    {Object.keys(tree[y]).map(Number).sort((a, b) => b - a).map(q => {
+                      const qKey      = `${y}-Q${q}`;
+                      const qOpen     = quarters.set.has(qKey);
+                      const qDeals    = Object.values(tree[y][q]).flat();
+                      const qTotal    = sum(qDeals);
+                      const priorQDeals = tree[priorY]?.[q] ? Object.values(tree[priorY][q]).flat() : null;
+                      const priorQTotal = priorQDeals ? sum(priorQDeals) : null;
+                      const qYoy      = calcYoy(qTotal, priorQTotal);
 
                       return (
-                        <div key={q} className="border-t border-gray-100">
-                          <HierarchyRow
-                            label={`Q${q} ${y}`} count={qDeals.length} total={sum(qDeals)}
+                        <div key={q}>
+                          <PeriodRow
+                            label={`Q${q} ${y}`} count={qDeals.length} total={qTotal} yoy={qYoy}
                             depth={1} open={qOpen} accentColor={accentColor}
                             onToggle={() => quarters.toggle(qKey)}
                           />
 
                           {qOpen && Object.keys(tree[y][q]).map(Number).sort((a, b) => b - a).map(m => {
-                            const mKey   = `${y}-Q${q}-${m}`;
-                            const mOpen  = months.set.has(mKey);
-                            const mDeals = tree[y][q][m];
+                            const mKey      = `${y}-Q${q}-${m}`;
+                            const mOpen     = months.set.has(mKey);
+                            const mDeals    = tree[y][q][m];
+                            const mTotal    = sum(mDeals);
+                            const priorMDeals = tree[priorY]?.[q]?.[m] ?? null;
+                            const priorMTotal = priorMDeals ? sum(priorMDeals) : null;
+                            const mYoy      = calcYoy(mTotal, priorMTotal);
 
                             return (
                               <div key={m} className="border-t border-gray-100">
-                                <HierarchyRow
-                                  label={`${MONTH_NAMES[m - 1]} ${y}`} count={mDeals.length} total={sum(mDeals)}
+                                <PeriodRow
+                                  label={`${MONTH_NAMES[m - 1]} ${y}`} count={mDeals.length} total={mTotal} yoy={mYoy}
                                   depth={2} open={mOpen} accentColor={accentColor}
                                   onToggle={() => months.toggle(mKey)}
                                 />
@@ -274,9 +341,9 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
                       );
                     })}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -293,13 +360,20 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
               {weekKeys.map(w => {
                 const wOpen  = weeks.set.has(w);
                 const wDeals = weekMap[w];
+                const wTotal = sum(wDeals);
                 return (
                   <div key={w}>
-                    <HierarchyRow
-                      label={`Week ${w}`} count={wDeals.length} total={sum(wDeals)}
-                      depth={3} open={wOpen} accentColor={accentColor}
-                      onToggle={() => weeks.toggle(w)}
-                    />
+                    <button
+                      onClick={() => weeks.toggle(w)}
+                      className="w-full flex items-center gap-4 px-5 py-2.5 hover:bg-gray-50 text-left transition-colors"
+                    >
+                      <span className="text-sm font-medium text-slate-700 flex-1">Week {w}</span>
+                      <span className="text-xs text-gray-400 w-16 text-right tabular-nums">
+                        {wDeals.length} deal{wDeals.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-700 w-24 text-right tabular-nums">{fmtK(wTotal)}</span>
+                      <span className="text-gray-400 text-[10px] w-3">{wOpen ? '▴' : '▾'}</span>
+                    </button>
                     {wOpen && <DealTable deals={wDeals} />}
                   </div>
                 );
