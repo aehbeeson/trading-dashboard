@@ -20,10 +20,11 @@ export const thisWeekDeals: Deal[] = [
   { id: 're2', company: 'KineticEd Group',    owner: 'Cara Bloom', value: 19000, stage: 'Proposal',          forecastCategory: 'Pipeline', closeDate: '2026-05-28', area: 'resellers', probability: 0.4 },
   { id: 're3', company: 'LearnBridge EMEA',   owner: 'Tom Archer', value: 61000, stage: 'Closed Won',        forecastCategory: 'Commit',   closeDate: '2026-04-30', area: 'resellers', probability: 1   },
 
-  // Guild
-  { id: 'gu1', company: 'MindPath Foundation', owner: 'Priya Nair', value: 15000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-01', area: 'guild', probability: 1   },
-  { id: 'gu2', company: 'Nexus Community',     owner: 'Priya Nair', value: 9500,  stage: 'Proposal', forecastCategory: 'Best Case', closeDate: '2026-05-18', area: 'guild', probability: 0.5 },
-  { id: 'gu3', company: 'OpenLearn Alliance',  owner: 'Raj Patel',  value: 22000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-02', area: 'guild', probability: 1   },
+  // Guild FLL
+  { id: 'gu1', company: 'MindPath Foundation', owner: 'Priya Nair', value: 15000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-01', area: 'guild-fll', probability: 1   },
+  { id: 'gu2', company: 'Nexus Community',     owner: 'Priya Nair', value: 9500,  stage: 'Proposal', forecastCategory: 'Best Case', closeDate: '2026-05-18', area: 'guild-fll', probability: 0.5 },
+  // Guild ELL
+  { id: 'gu3', company: 'OpenLearn Alliance',  owner: 'Raj Patel',  value: 22000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-02', area: 'guild-ell', probability: 1   },
 ];
 
 export const lastWeekDeals: Deal[] = [
@@ -45,8 +46,9 @@ export const lastWeekDeals: Deal[] = [
   { id: 're2', company: 'KineticEd Group',    owner: 'Cara Bloom', value: 19000, stage: 'Proposal',    forecastCategory: 'Pipeline',  closeDate: '2026-05-28', area: 'resellers', probability: 0.4 },
   { id: 're3', company: 'LearnBridge EMEA',   owner: 'Tom Archer', value: 56000, stage: 'Negotiation', forecastCategory: 'Best Case', closeDate: '2026-04-30', area: 'resellers', probability: 0.7 },
 
-  // Guild
-  { id: 'gu1', company: 'MindPath Foundation', owner: 'Priya Nair', value: 15000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-01', area: 'guild', probability: 1   },
-  { id: 'gu2', company: 'Nexus Community',     owner: 'Priya Nair', value: 9500,  stage: 'Proposal', forecastCategory: 'Pipeline',  closeDate: '2026-05-18', area: 'guild', probability: 0.5 },
-  { id: 'gu3', company: 'OpenLearn Alliance',  owner: 'Raj Patel',  value: 22000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-02', area: 'guild', probability: 1   },
+  // Guild FLL
+  { id: 'gu1', company: 'MindPath Foundation', owner: 'Priya Nair', value: 15000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-01', area: 'guild-fll', probability: 1   },
+  { id: 'gu2', company: 'Nexus Community',     owner: 'Priya Nair', value: 9500,  stage: 'Proposal', forecastCategory: 'Pipeline',  closeDate: '2026-05-18', area: 'guild-fll', probability: 0.5 },
+  // Guild ELL
+  { id: 'gu3', company: 'OpenLearn Alliance',  owner: 'Raj Patel',  value: 22000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-02', area: 'guild-ell', probability: 1   },
 ];

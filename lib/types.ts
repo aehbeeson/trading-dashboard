@@ -1,4 +1,4 @@
-export type AreaKey = 'new-business' | 'customer-success' | 'resellers' | 'guild' | 'partnerships';
+export type AreaKey = 'new-business' | 'customer-success' | 'resellers' | 'guild-fll' | 'guild-ell' | 'partnerships';
 
 export interface PeriodForecast {
   closedWon: number;
@@ -68,7 +68,8 @@ export const AREAS: AreaConfig[] = [
   { key: 'new-business',     label: 'New Business',     accentColor: '#3B82F6', bgLight: 'bg-blue-50',    borderColor: 'border-blue-200'    },
   { key: 'customer-success', label: 'Customer Success', accentColor: '#10B981', bgLight: 'bg-emerald-50', borderColor: 'border-emerald-200' },
   { key: 'resellers',        label: 'Resellers',        accentColor: '#8B5CF6', bgLight: 'bg-purple-50',  borderColor: 'border-purple-200'  },
-  { key: 'guild',            label: 'Guild',            accentColor: '#F59E0B', bgLight: 'bg-amber-50',   borderColor: 'border-amber-200'   },
+  { key: 'guild-fll',        label: 'Guild FLL',        accentColor: '#F59E0B', bgLight: 'bg-amber-50',   borderColor: 'border-amber-200'   },
+  { key: 'guild-ell',        label: 'Guild ELL',        accentColor: '#F97316', bgLight: 'bg-orange-50',  borderColor: 'border-orange-200'  },
   { key: 'partnerships',    label: 'Partnerships',    accentColor: '#EC4899', bgLight: 'bg-pink-50',    borderColor: 'border-pink-200'    },
 ];
 
