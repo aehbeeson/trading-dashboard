@@ -198,7 +198,7 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
               <th className="px-5 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Area</th>
               <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">SD Forecast</th>
               <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">YoY</th>
-              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">vs Forecast</th>
+              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">vs M</th>
             </tr>
           </thead>
           <tbody>
@@ -215,18 +215,28 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
 
 // ─── Mastersheet forecast helpers ────────────────────────────────────────────
 
-function getMthForecast(forecasts: MastersheetForecast[], area: string, year: number, month: number): number | null {
+function getMthForecast(forecasts: MastersheetForecast[], area: string, year: number, month: number, prorateTo?: Date): number | null {
   const entry = forecasts.find(f => f.area === area);
   if (!entry) return null;
   const key = `${year}-${String(month).padStart(2, '0')}`;
-  return entry.months[key] ?? null;
+  const amount = entry.months[key];
+  if (amount === undefined) return null;
+  if (prorateTo && year === prorateTo.getFullYear() && month === prorateTo.getMonth() + 1) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    return amount * (prorateTo.getDate() / daysInMonth);
+  }
+  return amount;
 }
 
-function getQtrForecast(forecasts: MastersheetForecast[], area: string, year: number, quarter: number): number | null {
+function getQtrForecast(forecasts: MastersheetForecast[], area: string, year: number, quarter: number, prorateTo?: Date): number | null {
   const startM = (quarter - 1) * 3 + 1;
   let total = 0;
   for (let m = startM; m < startM + 3; m++) {
-    const v = getMthForecast(forecasts, area, year, m);
+    if (prorateTo) {
+      const py = prorateTo.getFullYear(), pm = prorateTo.getMonth() + 1;
+      if (year > py || (year === py && m > pm)) continue; // future month — skip
+    }
+    const v = getMthForecast(forecasts, area, year, m, prorateTo);
     if (v === null) return null;
     total += v;
   }
@@ -283,6 +293,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
   }
 
   function buildMthRows(): RowData[] {
+    const today = new Date();
     const rows: RowData[] = [];
     for (const area of AREAS) {
       const twArea     = allThisWeek.filter(d => d.area === area.key);
@@ -291,7 +302,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       const lwCw       = closedWon(filterMonth(lwArea, selMthYear, selMth));
       const priorCw    = closedWon(filterMonth(twArea, selMthYear, selMth, -1));
       const sdForecast = getMthForecast(mastersheetForecasts, area.key, selMthYear, selMth);
-      const mTarget    = getMthForecast(monthsMForecasts,     area.key, selMthYear, selMth);
+      const mTarget    = getMthForecast(monthsMForecasts,     area.key, selMthYear, selMth, today);
       rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: mTarget !== null ? cw - mTarget : null, vsMBase: mTarget });
     }
     const tc   = rows.reduce((s, r) => s + r.cw, 0);
@@ -307,6 +318,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
   }
 
   function buildQtrRows(): RowData[] {
+    const today = new Date();
     const rows: RowData[] = [];
     for (const area of AREAS) {
       const twArea     = allThisWeek.filter(d => d.area === area.key);
@@ -315,7 +327,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       const lwCw       = closedWon(filterQuarter(lwArea, selQtrYear, selQtr));
       const priorCw    = closedWon(filterQuarter(twArea, selQtrYear, selQtr, -1));
       const sdForecast = getQtrForecast(mastersheetForecasts, area.key, selQtrYear, selQtr);
-      const mTarget    = getQtrForecast(monthsMForecasts,     area.key, selQtrYear, selQtr);
+      const mTarget    = getQtrForecast(monthsMForecasts,     area.key, selQtrYear, selQtr, today);
       rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: mTarget !== null ? cw - mTarget : null, vsMBase: mTarget });
     }
     const tc   = rows.reduce((s, r) => s + r.cw, 0);
