@@ -241,10 +241,11 @@ interface SummaryPageProps {
   sdForecasts:          SDForecastEntry[];
   overviewComments:     OverviewComment[];
   mastersheetForecasts: MastersheetForecast[];
+  monthsMForecasts:     MastersheetForecast[];
   onAreaClick:          (area: AreaKey) => void;
 }
 
-export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sdForecasts, overviewComments, mastersheetForecasts, onAreaClick }: SummaryPageProps) {
+export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sdForecasts, overviewComments, mastersheetForecasts, monthsMForecasts, onAreaClick }: SummaryPageProps) {
   const now  = new Date();
   const curY = now.getFullYear();
   const curM = now.getMonth() + 1;
@@ -290,16 +291,17 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       const lwCw       = closedWon(filterMonth(lwArea, selMthYear, selMth));
       const priorCw    = closedWon(filterMonth(twArea, selMthYear, selMth, -1));
       const sdForecast = getMthForecast(mastersheetForecasts, area.key, selMthYear, selMth);
-      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: sdForecast !== null ? cw - sdForecast : null, vsMBase: sdForecast });
+      const mTarget    = getMthForecast(monthsMForecasts,     area.key, selMthYear, selMth);
+      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: mTarget !== null ? cw - mTarget : null, vsMBase: mTarget });
     }
-    const tc  = rows.reduce((s, r) => s + r.cw, 0);
-    const tsd = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
-    const ay  = rows.some(r => r.yoy !== null);
-    const ty  = ay ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
-    const tyb = ay ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
-    const av  = rows.some(r => r.vsM !== null);
-    const tv  = av ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
-    const tvb = av ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
+    const tc   = rows.reduce((s, r) => s + r.cw, 0);
+    const tsd  = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
+    const ay   = rows.some(r => r.yoy !== null);
+    const ty   = ay ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
+    const tyb  = ay ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
+    const av   = rows.some(r => r.vsM !== null);
+    const tv   = av ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
+    const tvb  = av ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
     rows.push({ label: 'Total', cw: tc, sdForecast: tsd, wow: 0, wowBase: 0, yoy: ty, yoyBase: tyb, vsM: tv, vsMBase: tvb });
     return rows;
   }
@@ -313,16 +315,17 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       const lwCw       = closedWon(filterQuarter(lwArea, selQtrYear, selQtr));
       const priorCw    = closedWon(filterQuarter(twArea, selQtrYear, selQtr, -1));
       const sdForecast = getQtrForecast(mastersheetForecasts, area.key, selQtrYear, selQtr);
-      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: sdForecast !== null ? cw - sdForecast : null, vsMBase: sdForecast });
+      const mTarget    = getQtrForecast(monthsMForecasts,     area.key, selQtrYear, selQtr);
+      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: mTarget !== null ? cw - mTarget : null, vsMBase: mTarget });
     }
-    const tc  = rows.reduce((s, r) => s + r.cw, 0);
-    const tsd = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
-    const ay  = rows.some(r => r.yoy !== null);
-    const ty  = ay ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
-    const tyb = ay ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
-    const av  = rows.some(r => r.vsM !== null);
-    const tv  = av ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
-    const tvb = av ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
+    const tc   = rows.reduce((s, r) => s + r.cw, 0);
+    const tsd  = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
+    const ay   = rows.some(r => r.yoy !== null);
+    const ty   = ay ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
+    const tyb  = ay ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
+    const av   = rows.some(r => r.vsM !== null);
+    const tv   = av ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
+    const tvb  = av ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
     rows.push({ label: 'Total', cw: tc, sdForecast: tsd, wow: 0, wowBase: 0, yoy: ty, yoyBase: tyb, vsM: tv, vsMBase: tvb });
     return rows;
   }

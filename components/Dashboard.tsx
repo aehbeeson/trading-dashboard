@@ -14,6 +14,7 @@ interface DashboardProps {
   pipelineGenForecasts: PipelineGenForecastEntry[];
   overviewComments:     OverviewComment[];
   mastersheetForecasts: MastersheetForecast[];
+  monthsMForecasts:     MastersheetForecast[];
   dataDownloadedAt:     string;
   fetchedAt:            string;
 }
@@ -61,7 +62,7 @@ function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
 
 const [defaultFrom, defaultTo] = monthRange();
 
-export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, dataDownloadedAt, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, monthsMForecasts, dataDownloadedAt, fetchedAt }: DashboardProps) {
   const [activeArea,   setActiveArea]   = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('results');
   const [filterFrom,   setFilterFrom]   = useState(defaultFrom);
@@ -265,7 +266,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
 
       <main className="max-w-screen-xl mx-auto px-6 py-6">
         {activeArea === 'summary' ? (
-          <SummaryPage allThisWeek={thisWeek} allLastWeek={lastWeek} sdForecasts={sdForecasts} overviewComments={overviewComments} mastersheetForecasts={mastersheetForecasts} onAreaClick={handleAreaClick} />
+          <SummaryPage allThisWeek={thisWeek} allLastWeek={lastWeek} sdForecasts={sdForecasts} overviewComments={overviewComments} mastersheetForecasts={mastersheetForecasts} monthsMForecasts={monthsMForecasts} onAreaClick={handleAreaClick} />
         ) : (
           <AreaPage
             area={activeArea}
