@@ -1,16 +1,17 @@
-import { Deal, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry, OverviewComment } from './types';
-import { thisWeekDeals, lastWeekDeals } from './mockData';
+import { Deal, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry, OverviewComment, MastersheetForecast } from './types';
+import { thisWeekDeals, lastWeekDeals, mastersheetForecasts as mockMastersheetForecasts } from './mockData';
 
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwchrLZsUlIAHCVm7bV3orxCXHzxnodFeoDl3svh4jQNUFje6bz2KwtuySdV0mgVKl0Lg/exec';
 
 export interface SheetData {
-  thisWeek:            Deal[];
-  lastWeek:            Deal[];
-  sdForecasts:         SDForecastEntry[];
+  thisWeek:             Deal[];
+  lastWeek:             Deal[];
+  sdForecasts:          SDForecastEntry[];
   pipelineGen:          PipelineGenDeal[];
   pipelineGenLastWeek:  PipelineGenDeal[];
   pipelineGenForecasts: PipelineGenForecastEntry[];
   overviewComments:     OverviewComment[];
+  mastersheetForecasts: MastersheetForecast[];
   dataDownloadedAt:     string;
   fetchedAt:            string;
 }
@@ -38,11 +39,12 @@ export async function fetchDashboardData(): Promise<SheetData> {
       pipelineGenLastWeek:  data.pipelineGenLastWeek  ?? [],
       pipelineGenForecasts: data.pipelineGenForecasts ?? [],
       overviewComments:     data.overviewComments     ?? [],
+      mastersheetForecasts: data.mastersheetForecasts ?? mockMastersheetForecasts,
       dataDownloadedAt:     data.dataDownloadedAt     ?? '',
-      fetchedAt:           data.fetchedAt           ?? new Date().toISOString(),
+      fetchedAt:            data.fetchedAt            ?? new Date().toISOString(),
     };
   } catch (err) {
     console.error('fetchDashboardData failed, using mock data:', err);
-    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], pipelineGenForecasts: [], overviewComments: [], dataDownloadedAt: '', fetchedAt: new Date().toISOString() };
+    return { thisWeek: thisWeekDeals, lastWeek: lastWeekDeals, sdForecasts: [], pipelineGen: [], pipelineGenLastWeek: [], pipelineGenForecasts: [], overviewComments: [], mastersheetForecasts: mockMastersheetForecasts, dataDownloadedAt: '', fetchedAt: new Date().toISOString() };
   }
 }

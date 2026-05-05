@@ -1,4 +1,4 @@
-import { Deal } from './types';
+import { Deal, MastersheetForecast } from './types';
 
 // Placeholder data — replace by wiring up Google Sheets in lib/sheets.ts
 export const thisWeekDeals: Deal[] = [
@@ -51,4 +51,62 @@ export const lastWeekDeals: Deal[] = [
   { id: 'gu2', company: 'Nexus Community',     owner: 'Priya Nair', value: 9500,  stage: 'Proposal', forecastCategory: 'Pipeline',  closeDate: '2026-05-18', area: 'guild-fll', probability: 0.5 },
   // Guild ELL
   { id: 'gu3', company: 'OpenLearn Alliance',  owner: 'Raj Patel',  value: 22000, stage: 'Active',   forecastCategory: 'Commit',    closeDate: '2026-05-02', area: 'guild-ell', probability: 1   },
+];
+
+// SD forecast values from [Import Range] Mastersheet — mirrors the "Sales Director Forecast" rows per area
+export const mastersheetForecasts: MastersheetForecast[] = [
+  {
+    area: 'new-business',
+    months: {
+      '2026-01': 179922, '2026-02': 244540, '2026-03': 545488,
+      '2026-04': 152940, '2026-05': 371000, '2026-06': 572000,
+      '2026-07': 556000, '2026-08': 556000, '2026-09': 556000,
+      '2026-10': 583000, '2026-11': 583000, '2026-12': 583000,
+    },
+  },
+  {
+    area: 'customer-success',
+    months: {
+      '2026-01': 481046, '2026-02': 699972, '2026-03': 975218,
+      '2026-04': 271276, '2026-05': 497552, '2026-06': 940031,
+      '2026-07': 304326, '2026-08': 522469, '2026-09': 833810,
+      '2026-10': 549643, '2026-11': 828146, '2026-12': 1422835,
+    },
+  },
+  {
+    area: 'resellers',
+    months: {
+      '2026-01':  7468, '2026-02':    86, '2026-03':  513,
+      '2026-04': 36403, '2026-05': 10000, '2026-06': 131260,
+      '2026-07': 68728, '2026-08': 94440, '2026-09': 155000,
+      '2026-10': 73944, '2026-11': 68996, '2026-12': 208700,
+    },
+  },
+  {
+    area: 'guild-fll',
+    months: {
+      '2026-01': 346316, '2026-02': 495443, '2026-03': 425264,
+      '2026-04': 415144, '2026-05': 363611, '2026-06': 514312,
+      '2026-07': 533696, '2026-08': 533696, '2026-09': 533696,
+      '2026-10': 559541, '2026-11': 559541, '2026-12': 559541,
+    },
+  },
+  {
+    area: 'guild-ell',
+    months: {
+      '2026-01':  28114, '2026-02':  67157, '2026-03':  59641,
+      '2026-04':  48678, '2026-05':  24294, '2026-06': 165407,
+      '2026-07': 117594, '2026-08': 122763, '2026-09': 164115,
+      '2026-10': 174453, '2026-11': 174453, '2026-12': 174453,
+    },
+  },
+  {
+    area: 'partnerships',
+    months: {
+      '2026-01': 209795, '2026-02': 209356, '2026-03': 235965,
+      '2026-04': 341422, '2026-05': 229013, '2026-06': 228065,
+      '2026-07': 249823, '2026-08': 249345, '2026-09': 268728,
+      '2026-10': 254183, '2026-11': 266424, '2026-12': 293300,
+    },
+  },
 ];

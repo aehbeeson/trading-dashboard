@@ -1,20 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry, OverviewComment } from '@/lib/types';
+import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry, OverviewComment, MastersheetForecast } from '@/lib/types';
 import SummaryPage from './SummaryPage';
 import AreaPage from './AreaPage';
 
 interface DashboardProps {
-  thisWeek:            Deal[];
-  lastWeek:            Deal[];
-  sdForecasts:         SDForecastEntry[];
+  thisWeek:             Deal[];
+  lastWeek:             Deal[];
+  sdForecasts:          SDForecastEntry[];
   pipelineGen:          PipelineGenDeal[];
   pipelineGenLastWeek:  PipelineGenDeal[];
   pipelineGenForecasts: PipelineGenForecastEntry[];
   overviewComments:     OverviewComment[];
+  mastersheetForecasts: MastersheetForecast[];
   dataDownloadedAt:     string;
-  fetchedAt:           string;
+  fetchedAt:            string;
 }
 
 // Build YYYY-MM-DD from local date components to avoid UTC timezone shifts
@@ -60,7 +61,7 @@ function filterByDate(deals: Deal[], from: string, to: string): Deal[] {
 
 const [defaultFrom, defaultTo] = monthRange();
 
-export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, dataDownloadedAt, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, dataDownloadedAt, fetchedAt }: DashboardProps) {
   const [activeArea,   setActiveArea]   = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('results');
   const [filterFrom,   setFilterFrom]   = useState(defaultFrom);
@@ -264,7 +265,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
 
       <main className="max-w-screen-xl mx-auto px-6 py-6">
         {activeArea === 'summary' ? (
-          <SummaryPage allThisWeek={thisWeek} allLastWeek={lastWeek} sdForecasts={sdForecasts} overviewComments={overviewComments} onAreaClick={handleAreaClick} />
+          <SummaryPage allThisWeek={thisWeek} allLastWeek={lastWeek} sdForecasts={sdForecasts} overviewComments={overviewComments} mastersheetForecasts={mastersheetForecasts} onAreaClick={handleAreaClick} />
         ) : (
           <AreaPage
             area={activeArea}

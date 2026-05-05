@@ -33,6 +33,12 @@ export interface OverviewComment {
   updatedAt: string;
 }
 
+// SD forecast values from the [Import Range] Mastersheet tab, keyed by "YYYY-MM"
+export interface MastersheetForecast {
+  area:   string;                   // matches AreaKey
+  months: Record<string, number>;   // "2026-01" → EUR amount
+}
+
 export interface PipelineGenDeal {
   id:         string;
   company:    string;

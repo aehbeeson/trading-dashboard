@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Deal, AreaKey, AREAS, SDForecastEntry, OverviewComment } from '@/lib/types';
+import { Deal, AreaKey, AREAS, SDForecastEntry, OverviewComment, MastersheetForecast } from '@/lib/types';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -156,7 +156,9 @@ function DataRow({ row, stripe, period, comment, onAreaClick }: {
       </td>
 
       <td className="px-5 py-2 text-right align-top pt-3">
-        <span className="text-gray-300 text-xs italic">TBC</span>
+        {row.sdForecast !== null
+          ? <span className="text-sm font-medium text-slate-700">{fmtK(row.sdForecast)}</span>
+          : <span className="text-gray-300 text-xs">—</span>}
       </td>
       <td className="px-5 py-2 text-right align-top pt-3">
         <DeltaCell delta={row.yoy} base={row.yoyBase} />
@@ -211,17 +213,38 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
   );
 }
 
+// ─── Mastersheet forecast helpers ────────────────────────────────────────────
+
+function getMthForecast(forecasts: MastersheetForecast[], area: string, year: number, month: number): number | null {
+  const entry = forecasts.find(f => f.area === area);
+  if (!entry) return null;
+  const key = `${year}-${String(month).padStart(2, '0')}`;
+  return entry.months[key] ?? null;
+}
+
+function getQtrForecast(forecasts: MastersheetForecast[], area: string, year: number, quarter: number): number | null {
+  const startM = (quarter - 1) * 3 + 1;
+  let total = 0;
+  for (let m = startM; m < startM + 3; m++) {
+    const v = getMthForecast(forecasts, area, year, m);
+    if (v === null) return null;
+    total += v;
+  }
+  return total;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface SummaryPageProps {
-  allThisWeek:      Deal[];
-  allLastWeek:      Deal[];
-  sdForecasts:      SDForecastEntry[];
-  overviewComments: OverviewComment[];
-  onAreaClick:      (area: AreaKey) => void;
+  allThisWeek:          Deal[];
+  allLastWeek:          Deal[];
+  sdForecasts:          SDForecastEntry[];
+  overviewComments:     OverviewComment[];
+  mastersheetForecasts: MastersheetForecast[];
+  onAreaClick:          (area: AreaKey) => void;
 }
 
-export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts, overviewComments, onAreaClick }: SummaryPageProps) {
+export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sdForecasts, overviewComments, mastersheetForecasts, onAreaClick }: SummaryPageProps) {
   const now  = new Date();
   const curY = now.getFullYear();
   const curM = now.getMonth() + 1;
@@ -261,46 +284,46 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts, ove
   function buildMthRows(): RowData[] {
     const rows: RowData[] = [];
     for (const area of AREAS) {
-      const twArea  = allThisWeek.filter(d => d.area === area.key);
-      const lwArea  = allLastWeek.filter(d => d.area === area.key);
-      const cw      = closedWon(filterMonth(twArea, selMthYear, selMth));
-      const lwCw    = closedWon(filterMonth(lwArea, selMthYear, selMth));
-      const priorCw = closedWon(filterMonth(twArea, selMthYear, selMth, -1));
-      const sd      = sdForecasts.find(f => f.area === area.key);
-      const sdT     = sd ? sd.month.closedWon + sd.month.commit : null;
-      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast: null, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: sdT !== null ? cw - sdT : null, vsMBase: sdT });
+      const twArea     = allThisWeek.filter(d => d.area === area.key);
+      const lwArea     = allLastWeek.filter(d => d.area === area.key);
+      const cw         = closedWon(filterMonth(twArea, selMthYear, selMth));
+      const lwCw       = closedWon(filterMonth(lwArea, selMthYear, selMth));
+      const priorCw    = closedWon(filterMonth(twArea, selMthYear, selMth, -1));
+      const sdForecast = getMthForecast(mastersheetForecasts, area.key, selMthYear, selMth);
+      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: sdForecast !== null ? cw - sdForecast : null, vsMBase: sdForecast });
     }
     const tc  = rows.reduce((s, r) => s + r.cw, 0);
+    const tsd = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
     const ay  = rows.some(r => r.yoy !== null);
     const ty  = ay ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
     const tyb = ay ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
     const av  = rows.some(r => r.vsM !== null);
     const tv  = av ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
     const tvb = av ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
-    rows.push({ label: 'Total', cw: tc, sdForecast: null, wow: 0, wowBase: 0, yoy: ty, yoyBase: tyb, vsM: tv, vsMBase: tvb });
+    rows.push({ label: 'Total', cw: tc, sdForecast: tsd, wow: 0, wowBase: 0, yoy: ty, yoyBase: tyb, vsM: tv, vsMBase: tvb });
     return rows;
   }
 
   function buildQtrRows(): RowData[] {
     const rows: RowData[] = [];
     for (const area of AREAS) {
-      const twArea  = allThisWeek.filter(d => d.area === area.key);
-      const lwArea  = allLastWeek.filter(d => d.area === area.key);
-      const cw      = closedWon(filterQuarter(twArea, selQtrYear, selQtr));
-      const lwCw    = closedWon(filterQuarter(lwArea, selQtrYear, selQtr));
-      const priorCw = closedWon(filterQuarter(twArea, selQtrYear, selQtr, -1));
-      const sd      = sdForecasts.find(f => f.area === area.key);
-      const sdT     = sd ? sd.quarter.closedWon + sd.quarter.commit : null;
-      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast: null, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: sdT !== null ? cw - sdT : null, vsMBase: sdT });
+      const twArea     = allThisWeek.filter(d => d.area === area.key);
+      const lwArea     = allLastWeek.filter(d => d.area === area.key);
+      const cw         = closedWon(filterQuarter(twArea, selQtrYear, selQtr));
+      const lwCw       = closedWon(filterQuarter(lwArea, selQtrYear, selQtr));
+      const priorCw    = closedWon(filterQuarter(twArea, selQtrYear, selQtr, -1));
+      const sdForecast = getQtrForecast(mastersheetForecasts, area.key, selQtrYear, selQtr);
+      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: sdForecast !== null ? cw - sdForecast : null, vsMBase: sdForecast });
     }
     const tc  = rows.reduce((s, r) => s + r.cw, 0);
+    const tsd = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
     const ay  = rows.some(r => r.yoy !== null);
     const ty  = ay ? rows.reduce((s, r) => s + (r.yoy ?? 0), 0) : null;
     const tyb = ay ? rows.reduce((s, r) => s + (r.yoyBase ?? 0), 0) : null;
     const av  = rows.some(r => r.vsM !== null);
     const tv  = av ? rows.reduce((s, r) => s + (r.vsM ?? 0), 0) : null;
     const tvb = av ? rows.reduce((s, r) => s + (r.vsMBase ?? 0), 0) : null;
-    rows.push({ label: 'Total', cw: tc, sdForecast: null, wow: 0, wowBase: 0, yoy: ty, yoyBase: tyb, vsM: tv, vsMBase: tvb });
+    rows.push({ label: 'Total', cw: tc, sdForecast: tsd, wow: 0, wowBase: 0, yoy: ty, yoyBase: tyb, vsM: tv, vsMBase: tvb });
     return rows;
   }
 
