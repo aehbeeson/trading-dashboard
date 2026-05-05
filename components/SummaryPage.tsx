@@ -302,7 +302,8 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       const priorCw    = closedWon(filterMonth(twArea, selMthYear, selMth, -1));
       const sdForecast = getMthForecast(mastersheetForecasts, area.key, selMthYear, selMth);
       const mTarget    = getMthForecast(monthsMForecasts,     area.key, selMthYear, selMth);
-      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: mTarget !== null ? cw - mTarget : null, vsMBase: mTarget });
+      const vsM        = sdForecast !== null && mTarget !== null ? sdForecast - mTarget : null;
+      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM, vsMBase: mTarget });
     }
     const tc   = rows.reduce((s, r) => s + r.cw, 0);
     const tsd  = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
@@ -326,7 +327,8 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       const priorCw    = closedWon(filterQuarter(twArea, selQtrYear, selQtr, -1));
       const sdForecast = getQtrForecast(mastersheetForecasts, area.key, selQtrYear, selQtr);
       const mTarget    = getQtrForecast(monthsMForecasts,     area.key, selQtrYear, selQtr);
-      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM: mTarget !== null ? cw - mTarget : null, vsMBase: mTarget });
+      const vsM        = sdForecast !== null && mTarget !== null ? sdForecast - mTarget : null;
+      rows.push({ label: area.label, areaKey: area.key, accentColor: area.accentColor, cw, sdForecast, wow: cw - lwCw, wowBase: lwCw, yoy: priorCw > 0 || cw > 0 ? cw - priorCw : null, yoyBase: priorCw > 0 ? priorCw : null, vsM, vsMBase: mTarget });
     }
     const tc   = rows.reduce((s, r) => s + r.cw, 0);
     const tsd  = rows.every(r => r.sdForecast !== null) ? rows.reduce((s, r) => s + (r.sdForecast ?? 0), 0) : null;
