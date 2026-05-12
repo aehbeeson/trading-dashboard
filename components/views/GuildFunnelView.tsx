@@ -288,13 +288,13 @@ function TableView({ yearPeriods, priorYearPeriods = [], year, accentColor }: Vi
         <div className="overflow-x-auto">
           <table className="w-full text-[13px] tabular-nums">
             <colgroup>
-              <col style={{ width: '220px' }} />
-              {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '88px' }} />)}
-              <col style={{ width: '104px' }} />
-              <col style={{ width: '104px' }} />
-              <col style={{ width: '104px' }} />
-              <col style={{ width: '104px' }} />
-              <col style={{ width: '116px' }} />
+              <col style={{ width: '200px' }} />
+              {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '76px' }} />)}
+              <col style={{ width: '92px' }} />
+              <col style={{ width: '92px' }} />
+              <col style={{ width: '92px' }} />
+              <col style={{ width: '92px' }} />
+              <col style={{ width: '108px' }} />
             </colgroup>
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -317,7 +317,7 @@ function TableView({ yearPeriods, priorYearPeriods = [], year, accentColor }: Vi
                   <Fragment key={`${row.section}-${row.label}-${i}`}>
                     {isNewSection && (
                       <tr aria-hidden="true">
-                        <td colSpan={18} className="h-3 bg-white p-0 border-0" />
+                        <td colSpan={18} className="h-7 bg-white p-0 border-0" />
                       </tr>
                     )}
                     <tr className={s.rowCls} style={s.rowStyle}>
@@ -421,13 +421,13 @@ function YoyTable({ yearPeriods, priorYearPeriods, year, monthLabels }: YoyTable
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] tabular-nums">
           <colgroup>
-            <col style={{ width: '220px' }} />
-            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '88px' }} />)}
-            <col style={{ width: '104px' }} />
-            <col style={{ width: '104px' }} />
-            <col style={{ width: '104px' }} />
-            <col style={{ width: '104px' }} />
-            <col style={{ width: '116px' }} />
+            <col style={{ width: '200px' }} />
+            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '76px' }} />)}
+            <col style={{ width: '92px' }} />
+            <col style={{ width: '92px' }} />
+            <col style={{ width: '92px' }} />
+            <col style={{ width: '92px' }} />
+            <col style={{ width: '108px' }} />
           </colgroup>
           <thead>
             <tr className="bg-gray-50/60 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
