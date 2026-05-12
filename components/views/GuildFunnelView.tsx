@@ -154,78 +154,6 @@ function fmtSignedPct(v: number): string {
 }
 
 function TableView({ yearPeriods, priorYearPeriods = [], year }: ViewProps) {
-  // Build a sparse lookup: month (1..12) → metrics; missing months show as blanks
-  const byMonth = new Map<number, GuildFunnelMetrics>();
-  yearPeriods.forEach(p => byMonth.set(p.month, p.metrics));
-
-  function quarterMetrics(q: number): GuildFunnelMetrics | null {
-    const months = yearPeriods.filter(p => Math.ceil(p.month / 3) === q);
-    return months.length > 0 ? aggregateMetrics(months) : null;
-  }
-
-  function yearMetrics(): GuildFunnelMetrics | null {
-    return yearPeriods.length > 0 ? aggregateMetrics(yearPeriods) : null;
-  }
-
-  const monthLabels = Array.from({ length: 12 }, (_, i) =>
-    new Date(year, i, 1).toLocaleDateString('en-GB', { month: 'short' })
-  );
-
-  type Section = 'leads' | 'evs' | 'bookings';
-  type Row = {
-    section:    Section;
-    sectionLabel: string;
-    label:      string;
-    sublabel?:  string;          // shown when this row belongs to a sub-block (Conv inside EV's)
-    isFirst:    boolean;         // first row of its section
-    isTotal:    boolean;
-    isSubFirst?: boolean;        // first row of the Conversion sub-block
-    format:     (v: number) => string;
-    pick:       (m: GuildFunnelMetrics) => number;
-  };
-
-  const rows: Row[] = [
-    // ── Leads (light) ─────────────────────────────────────
-    { section: 'leads', sectionLabel: 'Leads', label: 'New',       isFirst: true,  isTotal: false, format: fmtNum, pick: m => m.newLeads       },
-    { section: 'leads', sectionLabel: 'Leads', label: 'Recurring', isFirst: false, isTotal: false, format: fmtNum, pick: m => m.recurringLeads },
-    { section: 'leads', sectionLabel: 'Leads', label: 'Total',     isFirst: false, isTotal: true,  format: fmtNum, pick: m => m.totalLeads     },
-    // ── EV's + Conversion (medium) ────────────────────────
-    { section: 'evs', sectionLabel: "EV's", label: 'New',       isFirst: true,  isTotal: false, format: fmtNum, pick: m => m.newEVs       },
-    { section: 'evs', sectionLabel: "EV's", label: 'Recurring', isFirst: false, isTotal: false, format: fmtNum, pick: m => m.recurringEVs },
-    { section: 'evs', sectionLabel: "EV's", label: 'Total',     isFirst: false, isTotal: true,  format: fmtNum, pick: m => m.totalEVs     },
-    { section: 'evs', sectionLabel: "EV's", label: 'New',       sublabel: 'Conversion', isFirst: false, isTotal: false, isSubFirst: true, format: fmtPct, pick: m => m.newConversion       },
-    { section: 'evs', sectionLabel: "EV's", label: 'Recurring', sublabel: 'Conversion', isFirst: false, isTotal: false, format: fmtPct, pick: m => m.recurringConversion },
-    { section: 'evs', sectionLabel: "EV's", label: 'Total',     sublabel: 'Conversion', isFirst: false, isTotal: true,  format: fmtPct, pick: m => m.totalConversion     },
-    // ── Bookings (dark — the outcome) ─────────────────────
-    { section: 'bookings', sectionLabel: 'Bookings', label: 'New',       isFirst: true,  isTotal: false, format: fmtEUR, pick: m => m.newBookings       },
-    { section: 'bookings', sectionLabel: 'Bookings', label: 'Recurring', isFirst: false, isTotal: false, format: fmtEUR, pick: m => m.recurringBookings },
-    { section: 'bookings', sectionLabel: 'Bookings', label: 'Total',     isFirst: false, isTotal: true,  format: fmtEUR, pick: m => m.totalBookings     },
-  ];
-
-  // Section-tinted styling. Each section deepens visually toward Bookings.
-  // `sticky` must be opaque so it hides scrolled content under it.
-  function styleFor(section: Section, isTotal: boolean) {
-    if (section === 'bookings') {
-      return isTotal
-        ? { row: 'bg-slate-800 text-white',           sticky: 'bg-slate-800',     weight: 'font-bold',      muted: 'text-slate-300' }
-        : { row: 'bg-slate-100/80 text-slate-800',    sticky: 'bg-slate-100',     weight: 'font-semibold',  muted: 'text-slate-500' };
-    }
-    if (section === 'evs') {
-      return isTotal
-        ? { row: 'bg-slate-100/80 text-slate-900',    sticky: 'bg-slate-100',     weight: 'font-semibold',  muted: 'text-slate-500' }
-        : { row: 'bg-white text-slate-700',           sticky: 'bg-white',         weight: 'font-medium',    muted: 'text-slate-400' };
-    }
-    return isTotal
-      ? { row: 'bg-slate-100/80 text-slate-900',      sticky: 'bg-slate-100',     weight: 'font-semibold',  muted: 'text-slate-500' }
-      : { row: 'bg-white text-slate-700',             sticky: 'bg-white',         weight: 'font-medium',    muted: 'text-slate-400' };
-  }
-
-  const q1 = quarterMetrics(1);
-  const q2 = quarterMetrics(2);
-  const q3 = quarterMetrics(3);
-  const q4 = quarterMetrics(4);
-  const yr = yearMetrics();
-
   if (yearPeriods.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card p-10 text-center text-slate-400 text-sm">
@@ -234,130 +162,231 @@ function TableView({ yearPeriods, priorYearPeriods = [], year }: ViewProps) {
     );
   }
 
-  // ── YoY plumbing ────────────────────────────────────────
-  const priorByMonth = new Map<number, GuildFunnelMetrics>();
-  priorYearPeriods.forEach(p => priorByMonth.set(p.month, p.metrics));
-  function priorQuarterMetrics(q: number): GuildFunnelMetrics | null {
-    const months = priorYearPeriods.filter(p => Math.ceil(p.month / 3) === q);
+  // ── Aggregations ───────────────────────────────────────
+  const byMonth = new Map<number, GuildFunnelMetrics>();
+  yearPeriods.forEach(p => byMonth.set(p.month, p.metrics));
+
+  function quarterMetrics(periods: GuildFunnelPeriod[], q: number) {
+    const months = periods.filter(p => Math.ceil(p.month / 3) === q);
     return months.length > 0 ? aggregateMetrics(months) : null;
   }
-  function priorYearMetrics(): GuildFunnelMetrics | null {
-    return priorYearPeriods.length > 0 ? aggregateMetrics(priorYearPeriods) : null;
-  }
-  const hasYoy = priorYearPeriods.length > 0;
-
-  function yoyDelta(curMetric: GuildFunnelMetrics | null, prevMetric: GuildFunnelMetrics | null, pick: (m: GuildFunnelMetrics) => number): number | null {
-    if (!curMetric || !prevMetric) return null;
-    const prev = pick(prevMetric);
-    if (prev === 0) return null;
-    return (pick(curMetric) - prev) / Math.abs(prev);
+  function yearMetrics(periods: GuildFunnelPeriod[]) {
+    return periods.length > 0 ? aggregateMetrics(periods) : null;
   }
 
-  type YoyRow = { label: string; isFirst: boolean; pick: (m: GuildFunnelMetrics) => number };
-  const yoyRows: YoyRow[] = hasYoy ? [
-    { label: 'Leads',     isFirst: true,  pick: m => m.totalLeads    },
-    { label: "EV's",      isFirst: false, pick: m => m.totalEVs      },
-    { label: 'Bookings',  isFirst: false, pick: m => m.totalBookings },
-  ] : [];
+  const q1 = quarterMetrics(yearPeriods, 1);
+  const q2 = quarterMetrics(yearPeriods, 2);
+  const q3 = quarterMetrics(yearPeriods, 3);
+  const q4 = quarterMetrics(yearPeriods, 4);
+  const yr = yearMetrics(yearPeriods);
 
-  function renderYoyCell(delta: number | null, key: string | number, extraCls = '') {
-    if (delta === null) {
-      return <td key={key} className={`px-3 py-2 text-right text-gray-300 ${extraCls}`}>—</td>;
+  const monthLabels = Array.from({ length: 12 }, (_, i) =>
+    new Date(year, i, 1).toLocaleDateString('en-GB', { month: 'short' })
+  );
+
+  // ── Row definitions ────────────────────────────────────
+  type Section = 'leads' | 'evs' | 'conversion' | 'bookings';
+  interface Row {
+    section:      Section;
+    sectionLabel: string;
+    label:        string;
+    isFirst:      boolean;     // first row of its section — section label shown
+    isTotal:      boolean;
+    format:       (v: number) => string;
+    pick:         (m: GuildFunnelMetrics) => number;
+  }
+
+  const rows: Row[] = [
+    { section: 'leads',      sectionLabel: 'Leads',      label: 'New',       isFirst: true,  isTotal: false, format: fmtNum, pick: m => m.newLeads        },
+    { section: 'leads',      sectionLabel: 'Leads',      label: 'Recurring', isFirst: false, isTotal: false, format: fmtNum, pick: m => m.recurringLeads  },
+    { section: 'leads',      sectionLabel: 'Leads',      label: 'Total',     isFirst: false, isTotal: true,  format: fmtNum, pick: m => m.totalLeads      },
+    { section: 'evs',        sectionLabel: "EV's",       label: 'New',       isFirst: true,  isTotal: false, format: fmtNum, pick: m => m.newEVs          },
+    { section: 'evs',        sectionLabel: "EV's",       label: 'Recurring', isFirst: false, isTotal: false, format: fmtNum, pick: m => m.recurringEVs    },
+    { section: 'evs',        sectionLabel: "EV's",       label: 'Total',     isFirst: false, isTotal: true,  format: fmtNum, pick: m => m.totalEVs        },
+    { section: 'conversion', sectionLabel: 'Conversion', label: 'Total',     isFirst: true,  isTotal: true,  format: fmtPct, pick: m => m.totalConversion },
+    { section: 'bookings',   sectionLabel: 'Bookings',   label: 'New',       isFirst: true,  isTotal: false, format: fmtEUR, pick: m => m.newBookings     },
+    { section: 'bookings',   sectionLabel: 'Bookings',   label: 'Recurring', isFirst: false, isTotal: false, format: fmtEUR, pick: m => m.recurringBookings },
+    { section: 'bookings',   sectionLabel: 'Bookings',   label: 'Total',     isFirst: false, isTotal: true,  format: fmtEUR, pick: m => m.totalBookings   },
+  ];
+
+  // Section-aware styling. Bookings is darkest (the outcome). Each row's
+  // sticky cell bg must match the row bg so horizontally-scrolled content
+  // doesn't bleed through.
+  function styleFor(section: Section, isTotal: boolean) {
+    if (section === 'bookings') {
+      return isTotal
+        ? { row: 'bg-slate-900 text-white',        sticky: 'bg-slate-900',   weight: 'font-bold',     muted: 'text-slate-400', qBg: 'bg-white/5',   yrBg: 'bg-white/10' }
+        : { row: 'bg-slate-100 text-slate-800',    sticky: 'bg-slate-100',   weight: 'font-semibold', muted: 'text-slate-400', qBg: 'bg-slate-200/40', yrBg: 'bg-slate-200/60' };
     }
-    const color = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-slate-400';
-    return <td key={key} className={`px-3 py-2 text-right font-semibold ${color} ${extraCls}`}>{fmtSignedPct(delta)}</td>;
+    if (section === 'conversion') {
+      return { row: 'bg-slate-50 text-slate-700',  sticky: 'bg-slate-50',    weight: 'font-semibold', muted: 'text-slate-400', qBg: 'bg-slate-100/60', yrBg: 'bg-slate-200/40' };
+    }
+    return isTotal
+      ? { row: 'bg-slate-50/70 text-slate-900',    sticky: 'bg-slate-50',    weight: 'font-semibold', muted: 'text-slate-400', qBg: 'bg-slate-100/60', yrBg: 'bg-slate-200/40' }
+      : { row: 'bg-white text-slate-700',          sticky: 'bg-white',       weight: 'font-medium',   muted: 'text-slate-300', qBg: 'bg-slate-50/60',  yrBg: 'bg-slate-100/60' };
   }
 
   return (
+    <div className="space-y-4">
+      {/* ── Main funnel table ───────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] tabular-nums">
+            <colgroup>
+              <col style={{ width: '220px' }} />
+              {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '88px' }} />)}
+              <col style={{ width: '104px' }} />
+              <col style={{ width: '104px' }} />
+              <col style={{ width: '104px' }} />
+              <col style={{ width: '104px' }} />
+              <col style={{ width: '116px' }} />
+            </colgroup>
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th className="sticky left-0 z-20 bg-gray-50 px-4 py-3 text-left">Metric</th>
+                {monthLabels.map((lbl, i) => (
+                  <th key={i} className="px-3 py-3 text-right">{lbl}</th>
+                ))}
+                <th className="px-3 py-3 text-right bg-slate-100/70">Q1</th>
+                <th className="px-3 py-3 text-right bg-slate-100/70">Q2</th>
+                <th className="px-3 py-3 text-right bg-slate-100/70">Q3</th>
+                <th className="px-3 py-3 text-right bg-slate-100/70">Q4</th>
+                <th className="px-3 py-3 text-right bg-slate-200/70 text-slate-700">{year}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const s = styleFor(row.section, row.isTotal);
+                const sectionStart = row.isFirst;
+                return (
+                  <tr
+                    key={`${row.section}-${row.label}-${i}`}
+                    className={`${s.row} ${sectionStart ? 'border-t-[3px] border-white' : ''}`}
+                  >
+                    <td className={`sticky left-0 z-10 ${s.sticky} px-4 py-2`}>
+                      <div className="flex items-baseline gap-3">
+                        <span className={`text-[10px] font-bold uppercase tracking-[0.14em] w-[80px] flex-shrink-0 ${s.muted}`}>
+                          {row.isFirst ? row.sectionLabel : ''}
+                        </span>
+                        <span className={s.weight}>{row.label}</span>
+                      </div>
+                    </td>
+                    {Array.from({ length: 12 }, (_, mi) => {
+                      const m = byMonth.get(mi + 1);
+                      return (
+                        <td key={mi} className={`px-3 py-2 text-right ${s.weight}`}>
+                          {m ? row.format(row.pick(m)) : <span className={s.muted}>—</span>}
+                        </td>
+                      );
+                    })}
+                    {[q1, q2, q3, q4].map((q, qi) => (
+                      <td key={qi} className={`px-3 py-2 text-right ${s.weight} ${s.qBg}`}>
+                        {q ? row.format(row.pick(q)) : <span className={s.muted}>—</span>}
+                      </td>
+                    ))}
+                    <td className={`px-3 py-2 text-right font-bold ${s.yrBg}`}>
+                      {yr ? row.format(row.pick(yr)) : <span className={s.muted}>—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── YoY card (separate) ─────────────────────────── */}
+      <YoyTable
+        yearPeriods={yearPeriods}
+        priorYearPeriods={priorYearPeriods}
+        year={year}
+        monthLabels={monthLabels}
+      />
+    </div>
+  );
+}
+
+// ─── YoY card ────────────────────────────────────────────────────────────────
+
+interface YoyTableProps {
+  yearPeriods:      GuildFunnelPeriod[];
+  priorYearPeriods: GuildFunnelPeriod[];
+  year:             number;
+  monthLabels:      string[];
+}
+
+function YoyTable({ yearPeriods, priorYearPeriods, year, monthLabels }: YoyTableProps) {
+  if (priorYearPeriods.length === 0) return null;
+
+  const curByMonth   = new Map<number, GuildFunnelMetrics>();
+  const priorByMonth = new Map<number, GuildFunnelMetrics>();
+  yearPeriods.forEach(p => curByMonth.set(p.month, p.metrics));
+  priorYearPeriods.forEach(p => priorByMonth.set(p.month, p.metrics));
+
+  function aggForQuarter(periods: GuildFunnelPeriod[], q: number) {
+    const m = periods.filter(p => Math.ceil(p.month / 3) === q);
+    return m.length > 0 ? aggregateMetrics(m) : null;
+  }
+  function aggForYear(periods: GuildFunnelPeriod[]) {
+    return periods.length > 0 ? aggregateMetrics(periods) : null;
+  }
+
+  function delta(cur: GuildFunnelMetrics | null | undefined, prev: GuildFunnelMetrics | null | undefined, pick: (m: GuildFunnelMetrics) => number): number | null {
+    if (!cur || !prev) return null;
+    const p = pick(prev);
+    if (p === 0) return null;
+    return (pick(cur) - p) / Math.abs(p);
+  }
+
+  function renderCell(d: number | null, key: string | number, extraCls = '') {
+    if (d === null) return <td key={key} className={`px-3 py-2 text-right text-slate-300 ${extraCls}`}>—</td>;
+    const color = d > 0 ? 'text-emerald-600' : d < 0 ? 'text-rose-600' : 'text-slate-400';
+    return <td key={key} className={`px-3 py-2 text-right font-semibold tabular-nums ${color} ${extraCls}`}>{fmtSignedPct(d)}</td>;
+  }
+
+  const rows = [
+    { label: 'Leads',    pick: (m: GuildFunnelMetrics) => m.totalLeads    },
+    { label: "EV's",     pick: (m: GuildFunnelMetrics) => m.totalEVs      },
+    { label: 'Bookings', pick: (m: GuildFunnelMetrics) => m.totalBookings },
+  ];
+
+  return (
     <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
+      <div className="px-5 py-3 bg-gray-50/80 border-b border-gray-200 flex items-baseline justify-between">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-700">Year-over-Year</h3>
+        <span className="text-[10.5px] font-medium text-slate-400">{year} vs {year - 1}</span>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] tabular-nums">
           <colgroup>
-            <col style={{ width: '210px' }} />
-            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '84px' }} />)}
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '112px' }} />
+            <col style={{ width: '220px' }} />
+            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '88px' }} />)}
+            <col style={{ width: '104px' }} />
+            <col style={{ width: '104px' }} />
+            <col style={{ width: '104px' }} />
+            <col style={{ width: '104px' }} />
+            <col style={{ width: '116px' }} />
           </colgroup>
           <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              <th className="sticky left-0 z-20 bg-gray-50 backdrop-blur px-4 py-3 text-left">Metric</th>
+            <tr className="bg-gray-50/60 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 text-left">Metric</th>
               {monthLabels.map((lbl, i) => (
-                <th key={i} className="px-3 py-3 text-right">{lbl}</th>
+                <th key={i} className="px-3 py-2.5 text-right">{lbl}</th>
               ))}
-              <th className="px-3 py-3 text-right bg-slate-50">Q1</th>
-              <th className="px-3 py-3 text-right bg-slate-50">Q2</th>
-              <th className="px-3 py-3 text-right bg-slate-50">Q3</th>
-              <th className="px-3 py-3 text-right bg-slate-50">Q4</th>
-              <th className="px-3 py-3 text-right bg-slate-100 text-slate-700">{year}</th>
+              <th className="px-3 py-2.5 text-right bg-slate-100/70">Q1</th>
+              <th className="px-3 py-2.5 text-right bg-slate-100/70">Q2</th>
+              <th className="px-3 py-2.5 text-right bg-slate-100/70">Q3</th>
+              <th className="px-3 py-2.5 text-right bg-slate-100/70">Q4</th>
+              <th className="px-3 py-2.5 text-right bg-slate-200/70 text-slate-700">{year}</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => {
-              const s = styleFor(row.section, row.isTotal);
-              const borderCls = row.isFirst
-                ? 'border-t-[3px] border-gray-200'
-                : row.isSubFirst
-                  ? 'border-t-[1.5px] border-gray-200/80'
-                  : 'border-t border-gray-50';
-
-              return (
-                <tr key={`${row.section}-${row.label}-${row.sublabel ?? ''}-${i}`} className={`${s.row} ${borderCls} transition-colors`}>
-                  <td className={`sticky left-0 z-10 ${s.sticky} px-4 py-2`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-bold uppercase tracking-[0.12em] w-[88px] flex-shrink-0 ${s.muted}`}>
-                        {row.isFirst ? row.sectionLabel : row.isSubFirst ? '↳ Conversion' : ''}
-                      </span>
-                      <span className={`${s.weight}`}>{row.label}</span>
-                    </div>
-                  </td>
-                  {Array.from({ length: 12 }, (_, mi) => {
-                    const m = byMonth.get(mi + 1);
-                    return (
-                      <td key={mi} className={`px-3 py-2 text-right ${s.weight}`}>
-                        {m ? row.format(row.pick(m)) : <span className={s.muted}>—</span>}
-                      </td>
-                    );
-                  })}
-                  {[q1, q2, q3, q4].map((q, qi) => (
-                    <td key={qi} className={`px-3 py-2 text-right ${s.weight} ${row.section === 'bookings' ? (row.isTotal ? 'bg-black/10' : 'bg-black/5') : (row.isTotal ? 'bg-slate-200/40' : 'bg-slate-50/60')}`}>
-                      {q ? row.format(row.pick(q)) : <span className={s.muted}>—</span>}
-                    </td>
-                  ))}
-                  <td className={`px-3 py-2 text-right font-bold ${row.section === 'bookings' ? (row.isTotal ? 'bg-black/15' : 'bg-black/10') : (row.isTotal ? 'bg-slate-200/60' : 'bg-slate-100/60')}`}>
-                    {yr ? row.format(row.pick(yr)) : <span className={s.muted}>—</span>}
-                  </td>
-                </tr>
-              );
-            })}
-
-            {/* ── YoY section ───────────────────────────── */}
-            {hasYoy && yoyRows.map((row, i) => (
-              <tr key={`yoy-${row.label}`} className={`${row.isFirst ? 'border-t-[3px] border-gray-200' : 'border-t border-gray-50'} bg-slate-50/40 text-slate-700`}>
-                <td className="sticky left-0 z-10 bg-slate-50/95 px-4 py-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] w-[88px] flex-shrink-0 text-slate-500">
-                      {row.isFirst ? `YoY vs ${year - 1}` : ''}
-                    </span>
-                    <span className="font-semibold">{row.label}</span>
-                  </div>
-                </td>
-                {Array.from({ length: 12 }, (_, mi) => {
-                  const d = yoyDelta(byMonth.get(mi + 1) ?? null, priorByMonth.get(mi + 1) ?? null, row.pick);
-                  return renderYoyCell(d, mi);
-                })}
-                {[1, 2, 3, 4].map(qNum => {
-                  const cur  = quarterMetrics(qNum);
-                  const prev = priorQuarterMetrics(qNum);
-                  const d = yoyDelta(cur, prev, row.pick);
-                  return renderYoyCell(d, `q${qNum}`, 'bg-slate-100/50');
-                })}
-                {(() => {
-                  const d = yoyDelta(yearMetrics(), priorYearMetrics(), row.pick);
-                  return renderYoyCell(d, 'yr', 'bg-slate-200/40 font-bold');
-                })()}
+            {rows.map(row => (
+              <tr key={row.label} className="border-t border-gray-50 hover:bg-slate-50/40 transition-colors">
+                <td className="sticky left-0 z-10 bg-white px-4 py-2 font-semibold text-slate-800">{row.label}</td>
+                {Array.from({ length: 12 }, (_, mi) => renderCell(delta(curByMonth.get(mi + 1), priorByMonth.get(mi + 1), row.pick), mi))}
+                {[1, 2, 3, 4].map(q => renderCell(delta(aggForQuarter(yearPeriods, q), aggForQuarter(priorYearPeriods, q), row.pick), `q${q}`, 'bg-slate-50/70'))}
+                {renderCell(delta(aggForYear(yearPeriods), aggForYear(priorYearPeriods), row.pick), 'yr', 'bg-slate-100/70 font-bold')}
               </tr>
             ))}
           </tbody>
