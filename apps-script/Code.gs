@@ -33,15 +33,17 @@ function getDashboardData() {
   }
 
   var result = {
-    thisWeek:            readTab(ss, 'Clean Data'),
-    lastWeek:            readTab(ss, 'Clean Data Last Week'),
-    sdForecasts:         readSDForecast(ss),
-    pipelineGen:         readPipelineGen(ss, 'Clean Data'),
-    pipelineGenLastWeek: readPipelineGen(ss, 'Clean Data Last Week'),
-    dataDownloadedAt:      dataDownloadedAt,
-    pipelineGenForecasts:  readPipelineGenForecast(ss),
-    overviewComments:      readOverviewComments(ss),
-    fetchedAt:             new Date().toISOString()
+    thisWeek:             readTab(ss, 'Clean Data'),
+    lastWeek:             readTab(ss, 'Clean Data Last Week'),
+    sdForecasts:          readSDForecast(ss),
+    pipelineGen:          readPipelineGen(ss, 'Clean Data'),
+    pipelineGenLastWeek:  readPipelineGen(ss, 'Clean Data Last Week'),
+    dataDownloadedAt:     dataDownloadedAt,
+    pipelineGenForecasts: readPipelineGenForecast(ss),
+    overviewComments:     readOverviewComments(ss),
+    mastersheetForecasts: readMastersheetForecast(ss),
+    monthsMForecasts:     readMonthsMForecast(ss),
+    fetchedAt:            new Date().toISOString()
   };
   Logger.log('thisWeek count: ' + result.thisWeek.length);
   Logger.log('lastWeek count: ' + result.lastWeek.length);
@@ -439,4 +441,123 @@ function readTab(ss, tabName) {
   }
 
   return deals;
+}
+
+// ── Mastersheet & Month's M readers ──────────────────────────────────────────
+// Both tabs share the same shape: a date header row, with metric rows below.
+// We extract values only from columns whose header is a real date — the
+// quarter/half/year aggregate columns are skipped (the frontend computes
+// those itself).
+
+function _parseMoneyish(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  if (typeof v === 'number') return v;
+  var s = String(v).replace(/[€$,\s]/g, '');
+  if (!s || s === '-') return null;
+  var n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function _monthKey(v) {
+  if (v instanceof Date) {
+    var y = v.getFullYear();
+    var m = v.getMonth() + 1;
+    return y + '-' + ('0' + m).slice(-2);
+  }
+  if (typeof v === 'string') {
+    var m1 = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);  // DD/MM/YYYY
+    if (m1) return m1[3] + '-' + m1[2];
+  }
+  return null;
+}
+
+function _buildMonthCols(headerRow) {
+  var cols = [];
+  for (var c = 1; c < headerRow.length; c++) {
+    var key = _monthKey(headerRow[c]);
+    if (key) cols.push({ col: c, key: key });
+  }
+  return cols;
+}
+
+function _labelIndex(rows) {
+  var idx = {};
+  for (var i = 0; i < rows.length; i++) {
+    var lbl = String(rows[i][0] || '').trim();
+    if (lbl && !(lbl in idx)) idx[lbl] = i;  // first occurrence wins
+  }
+  return idx;
+}
+
+function readMastersheetForecast(ss) {
+  var sheet = ss.getSheetByName('[Import Range] Mastersheet');
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length < 3) return [];
+
+  var monthCols = _buildMonthCols(rows[1]);
+  var labelIdx  = _labelIndex(rows);
+
+  // Dashboard area → row label that holds the SD Forecast per month.
+  var areaLabels = {
+    'new-business':     'NB Sales Director Forecast',
+    'customer-success': 'CS Sales Director Forecast',
+    'resellers':        'Resellers Sales Director Forecast',
+    'guild-fll':        'FLL Sales Director Forecast',
+    'guild-ell':        'ELL Sales Director Forecast',
+    'partnerships':     'Partnership Sales Director Forecast',
+  };
+
+  var result = [];
+  for (var areaKey in areaLabels) {
+    var rIdx = labelIdx[areaLabels[areaKey]];
+    if (rIdx === undefined) continue;
+    var months = {};
+    for (var j = 0; j < monthCols.length; j++) {
+      var v = _parseMoneyish(rows[rIdx][monthCols[j].col]);
+      if (v !== null) months[monthCols[j].key] = v;
+    }
+    result.push({ area: areaKey, months: months });
+  }
+  return result;
+}
+
+function readMonthsMForecast(ss) {
+  var sheet = ss.getSheetByName("[Import Range] Month's M");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length < 3) return [];
+
+  var monthCols = _buildMonthCols(rows[1]);
+
+  // Build lowercased-and-trimmed label → row index map (handles trailing spaces
+  // and case differences in the source tab).
+  var lowerIdx = {};
+  for (var i = 0; i < rows.length; i++) {
+    var lbl = String(rows[i][0] || '').trim().toLowerCase();
+    if (lbl && !(lbl in lowerIdx)) lowerIdx[lbl] = i;
+  }
+
+  // Dashboard area → expected row label in the sheet (lowercase).
+  var areaLabels = {
+    'new-business':     'new business',
+    'customer-success': 'customer success',
+    'resellers':        'resellers',
+    'guild-fll':        'guild fll',
+    'guild-ell':        'guild ell',
+    'partnerships':     'partnerships',
+  };
+
+  var result = [];
+  for (var areaKey in areaLabels) {
+    var rIdx = lowerIdx[areaLabels[areaKey]];
+    if (rIdx === undefined) continue;
+    var months = {};
+    for (var j = 0; j < monthCols.length; j++) {
+      var v = _parseMoneyish(rows[rIdx][monthCols[j].col]);
+      if (v !== null) months[monthCols[j].key] = v;
+    }
+    result.push({ area: areaKey, months: months });
+  }
+  return result;
 }
