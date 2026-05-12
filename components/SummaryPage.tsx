@@ -205,10 +205,10 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
           </colgroup>
           <thead>
             <tr className="bg-gray-50/70 border-b border-gray-200">
-              <th className="px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">Area</th>
-              <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">SD Forecast</th>
-              <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">YoY</th>
-              <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">vs M</th>
+              <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.12em] text-blue-700">Area</th>
+              <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.12em] text-blue-700">SD Forecast</th>
+              <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.12em] text-blue-700">YoY</th>
+              <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.12em] text-blue-700">vs M</th>
             </tr>
           </thead>
           <tbody>
@@ -400,7 +400,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-base font-semibold text-slate-900">{mthLabel}</h2>
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Monthly Results</span>
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Monthly Results</span>
           </div>
           <select
             value={`${selMthYear}-${selMth}`}
@@ -421,7 +421,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-base font-semibold text-slate-900">{qtrLabel}</h2>
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Quarterly Results</span>
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Quarterly Results</span>
           </div>
           <select
             value={`${selQtrYear}-${selQtr}`}
