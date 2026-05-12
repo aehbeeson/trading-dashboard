@@ -177,34 +177,65 @@ function getOrCreateForecastSheet(ss) {
     sheet = ss.insertSheet('SD Forecast');
     sheet.getRange(1, 1, 1, 16).setValues([[
       'SubmittedAt', 'Area',
-      'Month_ClosedWon', 'Month_Commit', 'Month_BestCase', 'Month_Pipeline', 'Month_Omitted',
-      'Qtr_ClosedWon',   'Qtr_Commit',   'Qtr_BestCase',   'Qtr_Pipeline',   'Qtr_Omitted',
-      'MainDeals', 'OtherDeals',
-      'Month_MostLikely', 'Qtr_MostLikely'
+      'Month_ClosedWon', 'Month_Commit', 'Month_MostLikely', 'Month_BestCase', 'Month_Pipeline', 'Month_Omitted',
+      'Qtr_ClosedWon',   'Qtr_Commit',   'Qtr_MostLikely',   'Qtr_BestCase',   'Qtr_Pipeline',   'Qtr_Omitted',
+      'MainDeals', 'OtherDeals'
     ]]);
   }
   return sheet;
 }
 
+// Build a { header label → column index } map from the sheet's first row.
+// Lets read/write code stay correct even if columns are reordered or new
+// columns are inserted between existing ones.
+function _headerIndex(headerRow) {
+  var idx = {};
+  for (var i = 0; i < headerRow.length; i++) {
+    var h = String(headerRow[i] || '').trim();
+    if (h) idx[h] = i;
+  }
+  return idx;
+}
+
 function handleSaveForecast(encodedData) {
   try {
-    var data = JSON.parse(decodeURIComponent(encodedData));
+    var data  = JSON.parse(decodeURIComponent(encodedData));
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = getOrCreateForecastSheet(ss);
 
-    // Always append — the full history is kept as a log.
-    // readSDForecast picks the most recent row per area when displaying.
+    // Read current headers so we write to the right columns regardless of
+    // their order in the sheet.
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var H       = _headerIndex(headers);
+
     var m = data.month   || {};
     var q = data.quarter || {};
-    sheet.appendRow([
-      new Date().toISOString(),
-      String(data.area).trim(),
-      Number(m.closedWon) || 0, Number(m.commit) || 0, Number(m.bestCase) || 0, Number(m.pipeline) || 0, Number(m.omitted) || 0,
-      Number(q.closedWon) || 0, Number(q.commit) || 0, Number(q.bestCase) || 0, Number(q.pipeline) || 0, Number(q.omitted) || 0,
-      String(data.mainDeals  || ''),
-      String(data.otherDeals || ''),
-      Number(m.mostLikely) || 0, Number(q.mostLikely) || 0,
-    ]);
+
+    var values = {
+      'SubmittedAt':      new Date().toISOString(),
+      'Area':             String(data.area).trim(),
+      'Month_ClosedWon':  Number(m.closedWon)  || 0,
+      'Month_Commit':     Number(m.commit)     || 0,
+      'Month_MostLikely': Number(m.mostLikely) || 0,
+      'Month_BestCase':   Number(m.bestCase)   || 0,
+      'Month_Pipeline':   Number(m.pipeline)   || 0,
+      'Month_Omitted':    Number(m.omitted)    || 0,
+      'Qtr_ClosedWon':    Number(q.closedWon)  || 0,
+      'Qtr_Commit':       Number(q.commit)     || 0,
+      'Qtr_MostLikely':   Number(q.mostLikely) || 0,
+      'Qtr_BestCase':     Number(q.bestCase)   || 0,
+      'Qtr_Pipeline':     Number(q.pipeline)   || 0,
+      'Qtr_Omitted':      Number(q.omitted)    || 0,
+      'MainDeals':        String(data.mainDeals  || ''),
+      'OtherDeals':       String(data.otherDeals || ''),
+    };
+
+    var row = new Array(lastCol).fill('');
+    for (var key in values) {
+      if (H[key] !== undefined) row[H[key]] = values[key];
+    }
+    sheet.appendRow(row);
 
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
@@ -222,14 +253,23 @@ function readSDForecast(ss) {
   var rows = sheet.getDataRange().getValues();
   if (rows.length < 2) return [];
 
+  // Look up columns by header name so column reordering or new inserts
+  // in the sheet don't break the read.
+  var H = _headerIndex(rows[0]);
+  function num(r, key) { var i = H[key]; return i === undefined ? 0 : (Number(r[i]) || 0); }
+  function str(r, key) { var i = H[key]; return i === undefined ? '' : String(r[i] || ''); }
+
+  var areaCol = H['Area'];
+  if (areaCol === undefined) return [];
+
   // Rows are appended chronologically. Walk forward so the last entry
   // for each area wins — that becomes the "current" forecast.
-  var latest = {}; // area → row
+  var latest = {};
   for (var i = 1; i < rows.length; i++) {
-    var r = rows[i];
-    var area = String(r[1] || '').trim();
+    var r    = rows[i];
+    var area = String(r[areaCol] || '').trim();
     if (!area) continue;
-    latest[area] = r; // later rows overwrite earlier ones
+    latest[area] = r;
   }
 
   var result = [];
@@ -238,24 +278,24 @@ function readSDForecast(ss) {
     result.push({
       area: key,
       month: {
-        closedWon:  Number(r[2])  || 0,
-        commit:     Number(r[3])  || 0,
-        mostLikely: Number(r[14]) || 0,
-        bestCase:   Number(r[4])  || 0,
-        pipeline:   Number(r[5])  || 0,
-        omitted:    Number(r[6])  || 0,
+        closedWon:  num(r, 'Month_ClosedWon'),
+        commit:     num(r, 'Month_Commit'),
+        mostLikely: num(r, 'Month_MostLikely'),
+        bestCase:   num(r, 'Month_BestCase'),
+        pipeline:   num(r, 'Month_Pipeline'),
+        omitted:    num(r, 'Month_Omitted'),
       },
       quarter: {
-        closedWon:  Number(r[7])  || 0,
-        commit:     Number(r[8])  || 0,
-        mostLikely: Number(r[15]) || 0,
-        bestCase:   Number(r[9])  || 0,
-        pipeline:   Number(r[10]) || 0,
-        omitted:    Number(r[11]) || 0,
+        closedWon:  num(r, 'Qtr_ClosedWon'),
+        commit:     num(r, 'Qtr_Commit'),
+        mostLikely: num(r, 'Qtr_MostLikely'),
+        bestCase:   num(r, 'Qtr_BestCase'),
+        pipeline:   num(r, 'Qtr_Pipeline'),
+        omitted:    num(r, 'Qtr_Omitted'),
       },
-      mainDeals:  String(r[12] || ''),
-      otherDeals: String(r[13] || ''),
-      updatedAt:  String(r[0]  || ''), // SubmittedAt timestamp
+      mainDeals:  str(r, 'MainDeals'),
+      otherDeals: str(r, 'OtherDeals'),
+      updatedAt:  H['SubmittedAt'] !== undefined ? String(r[H['SubmittedAt']] || '') : '',
     });
   }
   return result;
