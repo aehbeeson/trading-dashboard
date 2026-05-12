@@ -102,10 +102,10 @@ function DataRow({ row, period, comment, onAreaClick }: {
   }
 
   return (
-    <tr className={`border-b border-gray-100 last:border-0 group transition-colors ${
+    <tr className={`group transition-colors ${
       isTotal
-        ? 'bg-slate-50/80 font-semibold'
-        : 'hover:bg-slate-50/50'
+        ? 'bg-slate-100 border-b-2 border-slate-300'
+        : 'border-b border-gray-100 last:border-0 hover:bg-slate-50/50'
     }`}>
       <td className="px-4 py-2">
         <div
@@ -123,21 +123,21 @@ function DataRow({ row, period, comment, onAreaClick }: {
           )}
           <span className={`${
             isTotal
-              ? 'text-slate-900 text-sm font-semibold'
+              ? 'text-slate-900 text-[15px] font-bold tracking-tight'
               : 'font-medium text-slate-800 group-hover:text-slate-900 transition-colors'
           }`}>
             {row.label}
           </span>
         </div>
 
-        {!isTotal && (editing ? (
+        {editing ? (
           <div className="flex items-start gap-2 mt-1.5 ml-[18px]">
             <textarea
               autoFocus
               value={draft}
               onChange={e => setDraft(e.target.value)}
               rows={2}
-              placeholder="Add commentary…"
+              placeholder={isTotal ? 'Add summary commentary…' : 'Add commentary…'}
               className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300/60 focus:border-blue-300 resize-none text-slate-700 placeholder-gray-300 bg-white"
             />
             <div className="flex flex-col gap-1 shrink-0">
@@ -159,10 +159,10 @@ function DataRow({ row, period, comment, onAreaClick }: {
         ) : (
           <p onClick={() => setEditing(true)} className="ml-[18px] mt-0.5 cursor-text">
             {saved
-              ? <span className="text-xs text-slate-500 hover:text-slate-700 leading-snug transition-colors">{saved}</span>
-              : <span className="text-[11px] text-gray-300 italic hover:text-gray-400 transition-colors">Add note…</span>}
+              ? <span className={`text-xs leading-snug transition-colors ${isTotal ? 'text-slate-700 font-medium hover:text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>{saved}</span>
+              : <span className={`text-[11px] italic transition-colors ${isTotal ? 'text-slate-400 hover:text-slate-500' : 'text-gray-300 hover:text-gray-400'}`}>{isTotal ? 'Add summary note…' : 'Add note…'}</span>}
           </p>
-        ))}
+        )}
       </td>
 
       <td className="px-4 py-2 text-right align-top pt-2.5">
