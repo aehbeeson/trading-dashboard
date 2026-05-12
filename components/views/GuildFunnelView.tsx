@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { CSSProperties, Fragment, useMemo, useState } from 'react';
 import { GuildFunnelData, GuildFunnelMetrics, GuildFunnelPeriod } from '@/lib/types';
 
 type ViewMode = 'table' | 'funnel';
@@ -153,7 +153,26 @@ function fmtSignedPct(v: number): string {
   return sign + Math.round(v * 100) + '%';
 }
 
-function TableView({ yearPeriods, priorYearPeriods = [], year }: ViewProps) {
+// Linear interp from white toward the accent. amount=0 → white, 1 → full accent.
+function tint(hex: string, amount: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const m = (c: number) => Math.round(255 - (255 - c) * amount);
+  return `rgb(${m(r)}, ${m(g)}, ${m(b)})`;
+}
+// Darken an accent toward black. amount=0 unchanged, 1 → black.
+function shade(hex: string, amount: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const d = (c: number) => Math.round(c * (1 - amount));
+  return `rgb(${d(r)}, ${d(g)}, ${d(b)})`;
+}
+
+function TableView({ yearPeriods, priorYearPeriods = [], year, accentColor }: ViewProps) {
   if (yearPeriods.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card p-10 text-center text-slate-400 text-sm">
@@ -203,27 +222,63 @@ function TableView({ yearPeriods, priorYearPeriods = [], year }: ViewProps) {
     { section: 'evs',        sectionLabel: "EV's",       label: 'New',       isFirst: true,  isTotal: false, format: fmtNum, pick: m => m.newEVs          },
     { section: 'evs',        sectionLabel: "EV's",       label: 'Recurring', isFirst: false, isTotal: false, format: fmtNum, pick: m => m.recurringEVs    },
     { section: 'evs',        sectionLabel: "EV's",       label: 'Total',     isFirst: false, isTotal: true,  format: fmtNum, pick: m => m.totalEVs        },
-    { section: 'conversion', sectionLabel: 'Conversion', label: 'Total',     isFirst: true,  isTotal: true,  format: fmtPct, pick: m => m.totalConversion },
+    { section: 'conversion', sectionLabel: 'Conversion', label: 'New',       isFirst: true,  isTotal: false, format: fmtPct, pick: m => m.newConversion       },
+    { section: 'conversion', sectionLabel: 'Conversion', label: 'Recurring', isFirst: false, isTotal: false, format: fmtPct, pick: m => m.recurringConversion },
+    { section: 'conversion', sectionLabel: 'Conversion', label: 'Total',     isFirst: false, isTotal: true,  format: fmtPct, pick: m => m.totalConversion     },
     { section: 'bookings',   sectionLabel: 'Bookings',   label: 'New',       isFirst: true,  isTotal: false, format: fmtEUR, pick: m => m.newBookings     },
     { section: 'bookings',   sectionLabel: 'Bookings',   label: 'Recurring', isFirst: false, isTotal: false, format: fmtEUR, pick: m => m.recurringBookings },
     { section: 'bookings',   sectionLabel: 'Bookings',   label: 'Total',     isFirst: false, isTotal: true,  format: fmtEUR, pick: m => m.totalBookings   },
   ];
 
-  // Section-aware styling. Bookings is darkest (the outcome). Each row's
-  // sticky cell bg must match the row bg so horizontally-scrolled content
-  // doesn't bleed through.
-  function styleFor(section: Section, isTotal: boolean) {
+  // Section-aware styling. Bookings uses the area's accent color (light tint
+  // for non-totals, full accent + white for the Total row). All other sections
+  // use neutral slate scales. Sticky cell bg MUST match row bg so scrolled
+  // content doesn't bleed through the sticky column.
+  interface SectionStyle {
+    rowCls:      string;
+    stickyCls:   string;
+    rowStyle?:   CSSProperties;
+    stickyStyle?: CSSProperties;
+    weight:      string;
+    muted:       string;
+    qCls:        string;
+    yrCls:       string;
+    qStyle?:     CSSProperties;
+    yrStyle?:    CSSProperties;
+  }
+  function styleFor(section: Section, isTotal: boolean): SectionStyle {
     if (section === 'bookings') {
-      return isTotal
-        ? { row: 'bg-slate-900 text-white',        sticky: 'bg-slate-900',   weight: 'font-bold',     muted: 'text-slate-400', qBg: 'bg-white/5',   yrBg: 'bg-white/10' }
-        : { row: 'bg-slate-100 text-slate-800',    sticky: 'bg-slate-100',   weight: 'font-semibold', muted: 'text-slate-400', qBg: 'bg-slate-200/40', yrBg: 'bg-slate-200/60' };
+      if (isTotal) {
+        return {
+          rowCls: 'text-white',           stickyCls: '',
+          rowStyle:    { backgroundColor: accentColor },
+          stickyStyle: { backgroundColor: accentColor },
+          weight: 'font-bold',
+          muted:  'text-white/60',
+          qCls:   '',   yrCls:   '',
+          qStyle:  { backgroundColor: shade(accentColor, 0.08) },
+          yrStyle: { backgroundColor: shade(accentColor, 0.16) },
+        };
+      }
+      return {
+        rowCls: 'text-slate-900',         stickyCls: '',
+        rowStyle:    { backgroundColor: tint(accentColor, 0.12) },
+        stickyStyle: { backgroundColor: tint(accentColor, 0.12) },
+        weight: 'font-semibold',
+        muted:  'text-slate-500',
+        qCls:   '',   yrCls:   '',
+        qStyle:  { backgroundColor: tint(accentColor, 0.20) },
+        yrStyle: { backgroundColor: tint(accentColor, 0.28) },
+      };
     }
     if (section === 'conversion') {
-      return { row: 'bg-slate-50 text-slate-700',  sticky: 'bg-slate-50',    weight: 'font-semibold', muted: 'text-slate-400', qBg: 'bg-slate-100/60', yrBg: 'bg-slate-200/40' };
+      return isTotal
+        ? { rowCls: 'bg-slate-100/70 text-slate-900', stickyCls: 'bg-slate-100', weight: 'font-semibold', muted: 'text-slate-400', qCls: 'bg-slate-200/40', yrCls: 'bg-slate-200/60' }
+        : { rowCls: 'bg-slate-50 text-slate-700',     stickyCls: 'bg-slate-50',  weight: 'font-medium',   muted: 'text-slate-400', qCls: 'bg-slate-100/60', yrCls: 'bg-slate-100/80' };
     }
     return isTotal
-      ? { row: 'bg-slate-50/70 text-slate-900',    sticky: 'bg-slate-50',    weight: 'font-semibold', muted: 'text-slate-400', qBg: 'bg-slate-100/60', yrBg: 'bg-slate-200/40' }
-      : { row: 'bg-white text-slate-700',          sticky: 'bg-white',       weight: 'font-medium',   muted: 'text-slate-300', qBg: 'bg-slate-50/60',  yrBg: 'bg-slate-100/60' };
+      ? { rowCls: 'bg-slate-50/70 text-slate-900',    stickyCls: 'bg-slate-50',  weight: 'font-semibold', muted: 'text-slate-400', qCls: 'bg-slate-100/60', yrCls: 'bg-slate-200/40' }
+      : { rowCls: 'bg-white text-slate-700',          stickyCls: 'bg-white',     weight: 'font-medium',   muted: 'text-slate-300', qCls: 'bg-slate-50/60',  yrCls: 'bg-slate-100/60' };
   }
 
   return (
@@ -257,37 +312,44 @@ function TableView({ yearPeriods, priorYearPeriods = [], year }: ViewProps) {
             <tbody>
               {rows.map((row, i) => {
                 const s = styleFor(row.section, row.isTotal);
-                const sectionStart = row.isFirst;
+                const isNewSection = i > 0 && rows[i - 1].section !== row.section;
                 return (
-                  <tr
-                    key={`${row.section}-${row.label}-${i}`}
-                    className={`${s.row} ${sectionStart ? 'border-t-[3px] border-white' : ''}`}
-                  >
-                    <td className={`sticky left-0 z-10 ${s.sticky} px-4 py-2`}>
-                      <div className="flex items-baseline gap-3">
-                        <span className={`text-[10px] font-bold uppercase tracking-[0.14em] w-[80px] flex-shrink-0 ${s.muted}`}>
-                          {row.isFirst ? row.sectionLabel : ''}
-                        </span>
-                        <span className={s.weight}>{row.label}</span>
-                      </div>
-                    </td>
-                    {Array.from({ length: 12 }, (_, mi) => {
-                      const m = byMonth.get(mi + 1);
-                      return (
-                        <td key={mi} className={`px-3 py-2 text-right ${s.weight}`}>
-                          {m ? row.format(row.pick(m)) : <span className={s.muted}>—</span>}
-                        </td>
-                      );
-                    })}
-                    {[q1, q2, q3, q4].map((q, qi) => (
-                      <td key={qi} className={`px-3 py-2 text-right ${s.weight} ${s.qBg}`}>
-                        {q ? row.format(row.pick(q)) : <span className={s.muted}>—</span>}
+                  <Fragment key={`${row.section}-${row.label}-${i}`}>
+                    {isNewSection && (
+                      <tr aria-hidden="true">
+                        <td colSpan={18} className="h-3 bg-white p-0 border-0" />
+                      </tr>
+                    )}
+                    <tr className={s.rowCls} style={s.rowStyle}>
+                      <td
+                        className={`sticky left-0 z-10 ${s.stickyCls} px-4 py-2`}
+                        style={s.stickyStyle}
+                      >
+                        <div className="flex items-baseline gap-3">
+                          <span className={`text-[10px] font-bold uppercase tracking-[0.14em] w-[80px] flex-shrink-0 ${s.muted}`}>
+                            {row.isFirst ? row.sectionLabel : ''}
+                          </span>
+                          <span className={s.weight}>{row.label}</span>
+                        </div>
                       </td>
-                    ))}
-                    <td className={`px-3 py-2 text-right font-bold ${s.yrBg}`}>
-                      {yr ? row.format(row.pick(yr)) : <span className={s.muted}>—</span>}
-                    </td>
-                  </tr>
+                      {Array.from({ length: 12 }, (_, mi) => {
+                        const m = byMonth.get(mi + 1);
+                        return (
+                          <td key={mi} className={`px-3 py-2 text-right ${s.weight}`}>
+                            {m ? row.format(row.pick(m)) : <span className={s.muted}>—</span>}
+                          </td>
+                        );
+                      })}
+                      {[q1, q2, q3, q4].map((q, qi) => (
+                        <td key={qi} className={`px-3 py-2 text-right ${s.weight} ${s.qCls}`} style={s.qStyle}>
+                          {q ? row.format(row.pick(q)) : <span className={s.muted}>—</span>}
+                        </td>
+                      ))}
+                      <td className={`px-3 py-2 text-right font-bold ${s.yrCls}`} style={s.yrStyle}>
+                        {yr ? row.format(row.pick(yr)) : <span className={s.muted}>—</span>}
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
