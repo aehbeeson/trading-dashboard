@@ -179,17 +179,17 @@ export default function WoWView({ thisWeek, lastWeek, allLastWeek }: WoWViewProp
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-semibold text-white" style={{ backgroundColor: '#1e3a5f' }}>
-                <th className="px-4 py-3 font-semibold">Client</th>
-                <th className="px-4 py-3 font-semibold">Close Date<br /><span className="font-normal opacity-70">(Last Week)</span></th>
+              <tr className="text-left text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.12em] bg-gray-50/70 border-b border-gray-200">
+                <th className="px-4 py-3 font-semibold normal-case tracking-normal text-[10.5px] uppercase tracking-[0.12em]">Client</th>
+                <th className="px-4 py-3 font-semibold">Close Date<br /><span className="font-normal opacity-70 normal-case tracking-normal text-[10px]">(Last Week)</span></th>
                 <th className="px-4 py-3 font-semibold">Close Date</th>
-                <th className="px-4 py-3 font-semibold">Forecast Category<br /><span className="font-normal opacity-70">(Last Week)</span></th>
-                <th className="px-4 py-3 font-semibold">Forecast Category</th>
-                <th className="px-4 py-3 font-semibold text-right">Deal Value<br /><span className="font-normal opacity-70">(Last Week)</span></th>
+                <th className="px-4 py-3 font-semibold">Forecast Cat.<br /><span className="font-normal opacity-70 normal-case tracking-normal text-[10px]">(Last Week)</span></th>
+                <th className="px-4 py-3 font-semibold">Forecast Cat.</th>
+                <th className="px-4 py-3 font-semibold text-right">Deal Value<br /><span className="font-normal opacity-70 normal-case tracking-normal text-[10px]">(Last Week)</span></th>
                 <th className="px-4 py-3 font-semibold text-right">Deal Value</th>
                 <th className="px-4 py-3 font-semibold text-right">Change in<br />Deal Value</th>
               </tr>

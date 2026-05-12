@@ -43,11 +43,11 @@ function closedWon(deals: Deal[]): number {
 function DeltaCell({ delta, base }: { delta: number | null; base: number | null }) {
   if (delta === null || base === null) return <span className="text-gray-300 text-xs">—</span>;
   if (delta === 0 && base === 0)       return <span className="text-gray-400 text-xs">—</span>;
-  const color     = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-red-500' : 'text-gray-400';
+  const color     = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-gray-400';
   const pct       = base !== 0 ? (delta / Math.abs(base)) * 100 : null;
-  const bubbleCls = delta > 0 ? 'bg-emerald-100 text-emerald-700' : delta < 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500';
+  const bubbleCls = delta > 0 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/60' : delta < 0 ? 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200/60' : 'bg-gray-50 text-gray-500';
   return (
-    <div className={`${color} font-medium tabular-nums flex items-center justify-end gap-1.5`}>
+    <div className={`${color} font-semibold tabular-nums flex items-center justify-end gap-1.5`}>
       <span className="text-sm">{delta > 0 ? '+' : ''}{fmtK(delta)}</span>
       {pct !== null && (
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${bubbleCls}`}>{fmtPct(pct)}</span>
@@ -72,10 +72,8 @@ interface RowData {
   vsMBase:      number | null;
 }
 
-// Inline comment lives in the same row as the area data
-function DataRow({ row, stripe, period, comment, onAreaClick }: {
+function DataRow({ row, period, comment, onAreaClick }: {
   row:         RowData;
-  stripe:      boolean;
   period:      string;
   comment:     string;
   onAreaClick: (area: AreaKey) => void;
@@ -104,66 +102,78 @@ function DataRow({ row, stripe, period, comment, onAreaClick }: {
   }
 
   return (
-    <tr className={`border-b border-gray-100 ${isTotal ? 'bg-gray-50 font-bold' : stripe ? 'bg-gray-50/40' : 'bg-white'}`}>
-      {/* Area name + inline note */}
-      <td className="px-5 py-2">
+    <tr className={`border-b border-gray-100 last:border-0 group transition-colors ${
+      isTotal
+        ? 'bg-slate-50/80 font-semibold'
+        : 'hover:bg-slate-50/50'
+    }`}>
+      <td className="px-5 py-3">
         <div
           onClick={() => row.areaKey && onAreaClick(row.areaKey)}
-          className={`flex items-center gap-2.5 ${row.areaKey ? 'cursor-pointer group' : ''}`}
+          className={`flex items-center gap-2.5 ${row.areaKey ? 'cursor-pointer' : ''}`}
         >
           {row.accentColor && (
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.accentColor }} />
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_0_3px_rgba(255,255,255,1)] ring-1 ring-black/5"
+              style={{ backgroundColor: row.accentColor }}
+            />
           )}
-          <span className={`${isTotal ? 'text-slate-800 text-sm' : 'font-medium text-slate-700 group-hover:text-blue-600 transition-colors'}`}>
+          {isTotal && (
+            <span className="w-2 h-2 flex-shrink-0" />
+          )}
+          <span className={`${
+            isTotal
+              ? 'text-slate-900 text-sm font-semibold'
+              : 'font-medium text-slate-800 group-hover:text-slate-900 transition-colors'
+          }`}>
             {row.label}
           </span>
         </div>
 
-        {/* Comment inline below name */}
-        {editing ? (
-          <div className="flex items-start gap-2 mt-1.5 ml-5">
+        {!isTotal && (editing ? (
+          <div className="flex items-start gap-2 mt-2 ml-[18px]">
             <textarea
               autoFocus
               value={draft}
               onChange={e => setDraft(e.target.value)}
               rows={2}
               placeholder="Add commentary…"
-              className="flex-1 text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none text-slate-600 placeholder-gray-300"
+              className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300/60 focus:border-blue-300 resize-none text-slate-700 placeholder-gray-300 bg-white"
             />
             <div className="flex flex-col gap-1 shrink-0">
               <button
                 onClick={save}
                 disabled={saving}
-                className="px-2 py-0.5 text-[10px] rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="px-2.5 py-1 text-[10px] font-semibold rounded-md bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
               >
                 {saving ? '…' : 'Save'}
               </button>
               <button
                 onClick={() => { setDraft(saved); setEditing(false); }}
-                className="px-2 py-0.5 text-[10px] rounded bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                className="px-2.5 py-1 text-[10px] font-medium rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
             </div>
           </div>
         ) : (
-          <p onClick={() => setEditing(true)} className="ml-5 mt-0.5 cursor-text">
+          <p onClick={() => setEditing(true)} className="ml-[18px] mt-1 cursor-text">
             {saved
               ? <span className="text-xs text-slate-500 hover:text-slate-700 leading-snug transition-colors">{saved}</span>
               : <span className="text-[11px] text-gray-300 italic hover:text-gray-400 transition-colors">Add note…</span>}
           </p>
-        )}
+        ))}
       </td>
 
-      <td className="px-5 py-2 text-right align-top pt-3">
+      <td className="px-5 py-3 text-right align-top pt-3.5">
         {row.sdForecast !== null
-          ? <span className="text-sm font-medium text-slate-700">{fmtK(row.sdForecast)}</span>
+          ? <span className="text-sm font-semibold text-slate-800 tabular-nums">{fmtK(row.sdForecast)}</span>
           : <span className="text-gray-300 text-xs">—</span>}
       </td>
-      <td className="px-5 py-2 text-right align-top pt-3">
+      <td className="px-5 py-3 text-right align-top pt-3.5">
         <DeltaCell delta={row.yoy} base={row.yoyBase} />
       </td>
-      <td className="px-5 py-2 text-right align-top pt-3">
+      <td className="px-5 py-3 text-right align-top pt-3.5">
         {row.vsM !== null
           ? <DeltaCell delta={row.vsM} base={row.vsMBase} />
           : <span className="text-gray-300 text-xs italic">—</span>}
@@ -184,7 +194,7 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
   const areaRows = rows.filter(r => !!r.areaKey);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm table-fixed">
           <colgroup>
@@ -194,17 +204,17 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
             <col style={{ width: '170px' }} />
           </colgroup>
           <thead>
-            <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
-              <th className="px-5 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Area</th>
-              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">SD Forecast</th>
-              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">YoY</th>
-              <th className="px-5 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">vs M</th>
+            <tr className="bg-gray-50/70 border-b border-gray-200">
+              <th className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">Area</th>
+              <th className="px-5 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">SD Forecast</th>
+              <th className="px-5 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">YoY</th>
+              <th className="px-5 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">vs M</th>
             </tr>
           </thead>
           <tbody>
-            <DataRow row={totalRow} stripe={false} period={period} comment={comments['total'] ?? ''} onAreaClick={onAreaClick} />
-            {areaRows.map((row, i) => (
-              <DataRow key={row.areaKey} row={row} stripe={i % 2 !== 0} period={period} comment={comments[row.areaKey!] ?? ''} onAreaClick={onAreaClick} />
+            <DataRow row={totalRow} period={period} comment={comments['total'] ?? ''} onAreaClick={onAreaClick} />
+            {areaRows.map(row => (
+              <DataRow key={row.areaKey} row={row} period={period} comment={comments[row.areaKey!] ?? ''} onAreaClick={onAreaClick} />
             ))}
           </tbody>
         </table>
@@ -342,17 +352,60 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
     return rows;
   }
 
-  return (
-    <div className="space-y-8">
+  const mthRows  = buildMthRows();
+  const mthTotal = mthRows.find(r => !r.areaKey)!;
+  const qtrRows  = buildQtrRows();
+  const qtrTotal = qtrRows.find(r => !r.areaKey)!;
+  const isCurrentMonth = selMthYear === curY && selMth === curM;
 
-      {/* ── Month section ── */}
+  // Select-input styling reused for both period pickers
+  const selectCls = "appearance-none text-sm font-medium border border-gray-200 rounded-lg px-3 py-1.5 pr-8 text-slate-700 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300/60 cursor-pointer bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-no-repeat bg-[length:12px_12px] bg-[position:right_10px_center]";
+
+  return (
+    <div className="space-y-10">
+
+      {/* ── Page heading with inline Closed Won stat ─ */}
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Overview</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isCurrentMonth
+              ? <>Live snapshot for <span className="font-medium text-slate-700">{mthLabel}</span> across all areas.</>
+              : <>Historical snapshot for <span className="font-medium text-slate-700">{mthLabel}</span>.</>}
+          </p>
+        </div>
+        <div className="flex items-stretch gap-6 bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl shadow-card px-5 py-3">
+          <div className="text-right">
+            <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
+              Closed Won · {mthLabel}
+            </p>
+            <p className="mt-1 text-[28px] leading-none font-bold tabular-nums tracking-tight text-slate-900">
+              {fmtK(mthTotal.cw)}
+            </p>
+          </div>
+          <div className="w-px bg-gray-200/80" aria-hidden="true" />
+          <div className="text-right">
+            <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
+              Closed Won · {qtrLabel}
+            </p>
+            <p className="mt-1 text-[28px] leading-none font-bold tabular-nums tracking-tight text-slate-900">
+              {fmtK(qtrTotal.cw)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Month section ───────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-bold text-slate-800">{mthLabel} Results</h2>
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-base font-semibold text-slate-900">{mthLabel}</h2>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Monthly Results</span>
+          </div>
           <select
             value={`${selMthYear}-${selMth}`}
             onChange={e => { const [y, m] = e.target.value.split('-').map(Number); setSelMthYear(y); setSelMth(m); }}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+            className={selectCls}
           >
             {monthOptions.map(({ year, month }) => {
               const label = new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -360,24 +413,27 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
             })}
           </select>
         </div>
-        <ResultsTable key={mthKey} rows={buildMthRows()} onAreaClick={onAreaClick} period={mthKey} comments={buildCommentMap(mthKey)} />
+        <ResultsTable key={mthKey} rows={mthRows} onAreaClick={onAreaClick} period={mthKey} comments={buildCommentMap(mthKey)} />
       </div>
 
-      {/* ── Quarter section ── */}
+      {/* ── Quarter section ─────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-bold text-slate-800">{qtrLabel} Results</h2>
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-base font-semibold text-slate-900">{qtrLabel}</h2>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Quarterly Results</span>
+          </div>
           <select
             value={`${selQtrYear}-${selQtr}`}
             onChange={e => { const [y, q] = e.target.value.split('-').map(Number); setSelQtrYear(y); setSelQtr(q); }}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+            className={selectCls}
           >
             {qtrOptions.map(({ year, quarter }) => (
               <option key={`${year}-${quarter}`} value={`${year}-${quarter}`}>Q{quarter} {year}</option>
             ))}
           </select>
         </div>
-        <ResultsTable key={qtrKey} rows={buildQtrRows()} onAreaClick={onAreaClick} period={qtrKey} comments={buildCommentMap(qtrKey)} />
+        <ResultsTable key={qtrKey} rows={qtrRows} onAreaClick={onAreaClick} period={qtrKey} comments={buildCommentMap(qtrKey)} />
       </div>
 
     </div>

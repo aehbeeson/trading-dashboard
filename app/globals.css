@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    /* Subtle ambient gradient — perceptible but never busy */
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(59, 130, 246, 0.05), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(139, 92, 246, 0.04), transparent 55%),
+      #f8fafc;
+    background-attachment: fixed;
+    font-feature-settings: 'cv11', 'ss03';
+  }
+
+  /* Tabular numerals for every number — critical for dashboard alignment */
+  .tabular-nums,
+  td, th, .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .dash-card {
+    @apply bg-white rounded-xl border border-gray-200/80 shadow-card;
+  }
+
+  .dash-thead {
+    @apply bg-gray-50/70 border-b border-gray-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  .dash-th {
+    @apply px-5 py-2.5 text-left;
+  }
+}
+
+/* Custom scrollbar — quiet and clean */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225 / 0.6);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184 / 0.7); background-clip: padding-box; border: 2px solid transparent; }

@@ -273,16 +273,16 @@ function PipelineTable({
   const colSpan  = CATEGORIES.length + 2;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
-              <th className="px-5 py-3.5 text-left font-semibold text-xs uppercase tracking-wide w-52" />
+            <tr className="bg-gray-50/70 border-b border-gray-200">
+              <th className="px-5 py-3 text-left font-semibold text-[10.5px] uppercase tracking-[0.12em] text-slate-500 w-52" />
               {CATEGORIES.map(cat => (
-                <th key={cat} className="px-4 py-3.5 text-right font-semibold text-xs">{cat}</th>
+                <th key={cat} className="px-4 py-3 text-right font-semibold text-[10.5px] uppercase tracking-[0.12em] text-slate-500">{cat}</th>
               ))}
-              <th className="px-4 py-3.5 text-right font-semibold text-xs">Total</th>
+              <th className="px-4 py-3 text-right font-semibold text-[10.5px] uppercase tracking-[0.12em] text-slate-500">Total</th>
             </tr>
           </thead>
           <tbody>

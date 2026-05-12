@@ -137,9 +137,9 @@ export default function ResultsView({ deals }: ResultsViewProps) {
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {metrics.map(m => (
-          <div key={m.label} className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{m.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${m.color}`}>{m.value}</p>
+          <div key={m.label} className="bg-white rounded-2xl border border-gray-200/80 shadow-card p-4">
+            <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.14em]">{m.label}</p>
+            <p className={`text-2xl font-bold mt-1.5 tabular-nums tracking-tight ${m.color}`}>{m.value}</p>
           </div>
         ))}
       </div>
@@ -154,8 +154,8 @@ export default function ResultsView({ deals }: ResultsViewProps) {
               onClick={() => setSortKey(o.key)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                 sortKey === o.key
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white border border-gray-200/80 text-slate-500 hover:border-gray-300 hover:text-slate-700 shadow-card'
               }`}
             >
               {o.label}
@@ -164,7 +164,7 @@ export default function ResultsView({ deals }: ResultsViewProps) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
@@ -176,13 +176,13 @@ export default function ResultsView({ deals }: ResultsViewProps) {
               <col style={{ width: '150px' }} />
             </colgroup>
             <thead>
-              <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white text-xs uppercase tracking-wide">
-                <th className="px-5 py-2.5 text-left font-semibold" style={{ minWidth: '150px' }}>Company</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Owner</th>
-                <th className="px-5 py-2.5 text-right font-semibold hidden md:table-cell">Forecast</th>
-                <th className="px-5 py-2.5 text-right font-semibold hidden lg:table-cell">Probability</th>
-                <th className="px-5 py-2.5 text-right font-semibold">ARR</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Close Date</th>
+              <tr className="bg-gray-50/70 border-b border-gray-200 text-slate-500 text-[10.5px] uppercase tracking-[0.12em]">
+                <th className="px-5 py-3 text-left font-semibold" style={{ minWidth: '150px' }}>Company</th>
+                <th className="px-5 py-3 text-right font-semibold">Owner</th>
+                <th className="px-5 py-3 text-right font-semibold hidden md:table-cell">Forecast</th>
+                <th className="px-5 py-3 text-right font-semibold hidden lg:table-cell">Probability</th>
+                <th className="px-5 py-3 text-right font-semibold">ARR</th>
+                <th className="px-5 py-3 text-right font-semibold">Close Date</th>
               </tr>
             </thead>
             <tbody>

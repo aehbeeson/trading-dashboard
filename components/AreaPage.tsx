@@ -25,9 +25,12 @@ export default function AreaPage({ area, subTab, thisWeek, lastWeek, allLastWeek
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-5">
-        <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: config.accentColor }} />
-        <h2 className="text-xl font-bold text-slate-900">{config.label}</h2>
+      <div className="flex items-center gap-3 mb-6">
+        <span
+          className="w-3 h-3 rounded-full flex-shrink-0 shadow-[0_0_0_4px_rgba(255,255,255,0.9)] ring-1 ring-black/5"
+          style={{ backgroundColor: config.accentColor }}
+        />
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{config.label}</h2>
       </div>
 
       {subTab === 'results'  && <ResultsView      deals={thisWeek} accentColor={config.accentColor} />}

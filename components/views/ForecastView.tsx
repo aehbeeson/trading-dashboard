@@ -218,23 +218,23 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
       </div>
 
       {/* ── Forecast table ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: '#1e3a5f' }} className="text-white">
-                <th className="px-5 py-3.5 text-left font-semibold w-44 text-xs uppercase tracking-wide">Category</th>
-                <th className="px-4 py-3.5 text-right font-semibold text-xs">
-                  {monthLabel}<br /><span className="font-normal opacity-60 text-xs">Pipeline View</span>
+              <tr className="bg-gray-50/70 border-b border-gray-200 text-slate-500">
+                <th className="px-5 py-3 text-left font-semibold w-44 text-[10.5px] uppercase tracking-[0.12em]">Category</th>
+                <th className="px-4 py-3 text-right font-semibold text-[10.5px] uppercase tracking-[0.12em]">
+                  {monthLabel}<br /><span className="font-normal opacity-70 text-[10px] normal-case tracking-normal">Pipeline View</span>
                 </th>
-                <th className="px-4 py-3.5 text-right font-semibold text-xs">
+                <th className="px-4 py-3 text-right font-semibold text-[10.5px] uppercase tracking-[0.12em]">
                   SD Forecast
                 </th>
-                <th className="w-3 bg-slate-700/50" />
-                <th className="px-4 py-3.5 text-right font-semibold text-xs">
-                  {qLabel}<br /><span className="font-normal opacity-60 text-xs">Pipeline View</span>
+                <th className="w-3 bg-gray-100" />
+                <th className="px-4 py-3 text-right font-semibold text-[10.5px] uppercase tracking-[0.12em]">
+                  {qLabel}<br /><span className="font-normal opacity-70 text-[10px] normal-case tracking-normal">Pipeline View</span>
                 </th>
-                <th className="px-4 py-3.5 text-right font-semibold text-xs">
+                <th className="px-4 py-3 text-right font-semibold text-[10.5px] uppercase tracking-[0.12em]">
                   SD Forecast
                 </th>
               </tr>

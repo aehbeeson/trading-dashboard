@@ -274,28 +274,25 @@ export default function PriorPeriodView({ deals, accentColor }: PriorPeriodViewP
               const yoyYear    = calcYoy(yTotal, priorTotal);
 
               return (
-                <div key={y} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div key={y} className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
 
                   {/* Year header */}
-                  <div
-                    style={{ backgroundColor: '#1e3a5f' }}
-                    className="flex items-center gap-4 px-5 py-3.5 text-white"
-                  >
-                    <span className="text-base font-bold flex-1">{y}</span>
-                    <span className="text-xs text-slate-400 w-16 text-right tabular-nums">
+                  <div className="flex items-center gap-4 px-5 py-3.5 bg-slate-50/80 border-b border-gray-200">
+                    <span className="text-base font-bold flex-1 text-slate-900 tracking-tight">{y}</span>
+                    <span className="text-xs text-slate-500 w-16 text-right tabular-nums">
                       {yDeals.length} deal{yDeals.length !== 1 ? 's' : ''}
                     </span>
-                    <span className="text-base font-bold w-24 text-right tabular-nums">{fmtK(yTotal)}</span>
+                    <span className="text-base font-bold w-24 text-right tabular-nums text-slate-900">{fmtK(yTotal)}</span>
                     <span className="w-44 text-right">
                       {yoyYear ? (
-                        <span className={`text-sm font-medium tabular-nums ${yoyYear.delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <span className={`text-sm font-semibold tabular-nums ${yoyYear.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {yoyYear.delta >= 0 ? '+' : ''}{fmtK(yoyYear.delta)}{' '}
-                          <span className="opacity-75 text-xs">
+                          <span className="opacity-75 text-xs font-medium">
                             ({yoyYear.delta >= 0 ? '+' : ''}{Math.round(yoyYear.pct)}% vs {priorY})
                           </span>
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-500">no prior year data</span>
+                        <span className="text-xs text-slate-400">no prior year data</span>
                       )}
                     </span>
                     <span className="w-3" /> {/* spacer to align with toggle arrows below */}
