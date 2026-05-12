@@ -289,12 +289,12 @@ function TableView({ yearPeriods, priorYearPeriods = [], year, accentColor }: Vi
           <table className="w-full text-[13px] tabular-nums">
             <colgroup>
               <col style={{ width: '200px' }} />
-              {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '76px' }} />)}
-              <col style={{ width: '92px' }} />
-              <col style={{ width: '92px' }} />
-              <col style={{ width: '92px' }} />
-              <col style={{ width: '92px' }} />
-              <col style={{ width: '108px' }} />
+              {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '72px' }} />)}
+              <col style={{ width: '88px' }} />
+              <col style={{ width: '88px' }} />
+              <col style={{ width: '88px' }} />
+              <col style={{ width: '88px' }} />
+              <col style={{ width: '100px' }} />
             </colgroup>
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -422,12 +422,12 @@ function YoyTable({ yearPeriods, priorYearPeriods, year, monthLabels }: YoyTable
         <table className="w-full text-[13px] tabular-nums">
           <colgroup>
             <col style={{ width: '200px' }} />
-            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '76px' }} />)}
-            <col style={{ width: '92px' }} />
-            <col style={{ width: '92px' }} />
-            <col style={{ width: '92px' }} />
-            <col style={{ width: '92px' }} />
-            <col style={{ width: '108px' }} />
+            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '72px' }} />)}
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '100px' }} />
           </colgroup>
           <thead>
             <tr className="bg-gray-50/60 border-b border-gray-200 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">

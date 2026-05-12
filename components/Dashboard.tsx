@@ -388,7 +388,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
         </header>
 
         <main className="flex-1 px-4 md:px-8 py-6 md:py-8 min-w-0">
-          <div className={GUILD_FUNNEL_AREAS.includes(activeArea as AreaKey) ? '' : 'max-w-screen-xl mx-auto'}>
+          <div className={`${GUILD_FUNNEL_AREAS.includes(activeArea as AreaKey) ? 'max-w-screen-2xl' : 'max-w-screen-xl'} mx-auto`}>
             {activeArea === 'summary' ? (
               <SummaryPage
                 allThisWeek={thisWeek}
