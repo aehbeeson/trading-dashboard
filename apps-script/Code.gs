@@ -175,11 +175,12 @@ function getOrCreateForecastSheet(ss) {
   var sheet = ss.getSheetByName('SD Forecast');
   if (!sheet) {
     sheet = ss.insertSheet('SD Forecast');
-    sheet.getRange(1, 1, 1, 14).setValues([[
+    sheet.getRange(1, 1, 1, 16).setValues([[
       'SubmittedAt', 'Area',
       'Month_ClosedWon', 'Month_Commit', 'Month_BestCase', 'Month_Pipeline', 'Month_Omitted',
       'Qtr_ClosedWon',   'Qtr_Commit',   'Qtr_BestCase',   'Qtr_Pipeline',   'Qtr_Omitted',
-      'MainDeals', 'OtherDeals'
+      'MainDeals', 'OtherDeals',
+      'Month_MostLikely', 'Qtr_MostLikely'
     ]]);
   }
   return sheet;
@@ -202,6 +203,7 @@ function handleSaveForecast(encodedData) {
       Number(q.closedWon) || 0, Number(q.commit) || 0, Number(q.bestCase) || 0, Number(q.pipeline) || 0, Number(q.omitted) || 0,
       String(data.mainDeals  || ''),
       String(data.otherDeals || ''),
+      Number(m.mostLikely) || 0, Number(q.mostLikely) || 0,
     ]);
 
     return ContentService
@@ -236,18 +238,20 @@ function readSDForecast(ss) {
     result.push({
       area: key,
       month: {
-        closedWon: Number(r[2])  || 0,
-        commit:    Number(r[3])  || 0,
-        bestCase:  Number(r[4])  || 0,
-        pipeline:  Number(r[5])  || 0,
-        omitted:   Number(r[6])  || 0,
+        closedWon:  Number(r[2])  || 0,
+        commit:     Number(r[3])  || 0,
+        mostLikely: Number(r[14]) || 0,
+        bestCase:   Number(r[4])  || 0,
+        pipeline:   Number(r[5])  || 0,
+        omitted:    Number(r[6])  || 0,
       },
       quarter: {
-        closedWon: Number(r[7])  || 0,
-        commit:    Number(r[8])  || 0,
-        bestCase:  Number(r[9])  || 0,
-        pipeline:  Number(r[10]) || 0,
-        omitted:   Number(r[11]) || 0,
+        closedWon:  Number(r[7])  || 0,
+        commit:     Number(r[8])  || 0,
+        mostLikely: Number(r[15]) || 0,
+        bestCase:   Number(r[9])  || 0,
+        pipeline:   Number(r[10]) || 0,
+        omitted:    Number(r[11]) || 0,
       },
       mainDeals:  String(r[12] || ''),
       otherDeals: String(r[13] || ''),
@@ -368,11 +372,13 @@ function readTab(ss, tabName) {
   Logger.log(tabName + ' resolved columns: ' + JSON.stringify(C));
 
   var FORECAST_NORM = {
-    'commit':     'Commit',
-    'closed won': 'Commit',
-    'best case':  'Best Case',
-    'pipeline':   'Pipeline',
-    'omitted':    'Omitted',
+    'commit':      'Commit',
+    'closed won':  'Commit',
+    'most likely': 'Most Likely',
+    'mostlikely':  'Most Likely',
+    'best case':   'Best Case',
+    'pipeline':    'Pipeline',
+    'omitted':     'Omitted',
   };
 
   var tz = Session.getScriptTimeZone();

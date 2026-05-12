@@ -4,14 +4,15 @@ import { useState } from 'react';
 import { Deal, ForecastCategory } from '@/lib/types';
 
 const FORECAST_BADGE: Record<ForecastCategory, string> = {
-  'Commit':    'bg-emerald-100 text-emerald-800',
-  'Best Case': 'bg-blue-100 text-blue-800',
-  'Pipeline':  'bg-gray-100 text-gray-700',
-  'Omitted':   'bg-red-100 text-red-700',
+  'Commit':      'bg-emerald-100 text-emerald-800',
+  'Most Likely': 'bg-violet-100 text-violet-800',
+  'Best Case':   'bg-blue-100 text-blue-800',
+  'Pipeline':    'bg-gray-100 text-gray-700',
+  'Omitted':     'bg-red-100 text-red-700',
 };
 
 const FC_ORDER: Record<string, number> = {
-  'Commit': 4, 'Best Case': 3, 'Pipeline': 2, 'Omitted': 1,
+  'Commit': 5, 'Most Likely': 4, 'Best Case': 3, 'Pipeline': 2, 'Omitted': 1,
 };
 
 function fmt(v: number) {

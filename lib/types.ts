@@ -1,11 +1,12 @@
 export type AreaKey = 'new-business' | 'customer-success' | 'resellers' | 'guild-fll' | 'guild-ell' | 'partnerships';
 
 export interface PeriodForecast {
-  closedWon: number;
-  commit:    number;
-  bestCase:  number;
-  pipeline:  number;
-  omitted:   number;
+  closedWon:  number;
+  commit:     number;
+  mostLikely: number;
+  bestCase:   number;
+  pipeline:   number;
+  omitted:    number;
 }
 
 export interface SDForecastEntry {
@@ -47,7 +48,7 @@ export interface PipelineGenDeal {
   sourceType: string;     // raw Source Type value
   createDate: string;     // YYYY-MM-DD
 }
-export type ForecastCategory = 'Commit' | 'Best Case' | 'Pipeline' | 'Omitted';
+export type ForecastCategory = 'Commit' | 'Most Likely' | 'Best Case' | 'Pipeline' | 'Omitted';
 
 export interface Deal {
   id: string;

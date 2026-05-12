@@ -32,17 +32,18 @@ function fmtK(v: number) {
 
 // ─── Pipeline calculation ────────────────────────────────────────────────────
 
-type RowKey = 'closedWon' | 'commit' | 'bestCase' | 'pipeline' | 'omitted';
+type RowKey = 'closedWon' | 'commit' | 'mostLikely' | 'bestCase' | 'pipeline' | 'omitted';
 
 interface PipelineCalc extends Record<RowKey, number> { total: number; }
 
 function calcPipeline(deals: Deal[]): PipelineCalc {
-  const closedWon = deals.filter(d => d.probability >= 0.99).reduce((s, d) => s + d.value, 0);
-  const commit    = deals.filter(d => d.forecastCategory === 'Commit'    && d.probability < 0.99).reduce((s, d) => s + d.value, 0);
-  const bestCase  = deals.filter(d => d.forecastCategory === 'Best Case').reduce((s, d) => s + d.value, 0);
-  const pipeline  = deals.filter(d => d.forecastCategory === 'Pipeline' ).reduce((s, d) => s + d.value, 0);
-  const omitted   = deals.filter(d => d.forecastCategory === 'Omitted'  ).reduce((s, d) => s + d.value, 0);
-  return { closedWon, commit, bestCase, pipeline, omitted, total: closedWon + commit + bestCase + pipeline + omitted };
+  const closedWon  = deals.filter(d => d.probability >= 0.99).reduce((s, d) => s + d.value, 0);
+  const commit     = deals.filter(d => d.forecastCategory === 'Commit'      && d.probability < 0.99).reduce((s, d) => s + d.value, 0);
+  const mostLikely = deals.filter(d => d.forecastCategory === 'Most Likely').reduce((s, d) => s + d.value, 0);
+  const bestCase   = deals.filter(d => d.forecastCategory === 'Best Case'  ).reduce((s, d) => s + d.value, 0);
+  const pipeline   = deals.filter(d => d.forecastCategory === 'Pipeline'   ).reduce((s, d) => s + d.value, 0);
+  const omitted    = deals.filter(d => d.forecastCategory === 'Omitted'    ).reduce((s, d) => s + d.value, 0);
+  return { closedWon, commit, mostLikely, bestCase, pipeline, omitted, total: closedWon + commit + mostLikely + bestCase + pipeline + omitted };
 }
 
 // ─── State types ─────────────────────────────────────────────────────────────
@@ -54,15 +55,16 @@ interface SDForecast {
   otherDeals: string;
 }
 
-const EMPTY_PERIOD: PeriodForecast = { closedWon: 0, commit: 0, bestCase: 0, pipeline: 0, omitted: 0 };
+const EMPTY_PERIOD: PeriodForecast = { closedWon: 0, commit: 0, mostLikely: 0, bestCase: 0, pipeline: 0, omitted: 0 };
 const EMPTY_FORECAST: SDForecast   = { month: { ...EMPTY_PERIOD }, quarter: { ...EMPTY_PERIOD }, mainDeals: '', otherDeals: '' };
 
 const ROWS: Array<{ key: RowKey; label: string; readOnly?: boolean }> = [
-  { key: 'closedWon', label: 'Closed Won',    readOnly: true },
-  { key: 'commit',    label: 'Commit'                        },
-  { key: 'bestCase',  label: 'Best Case'                     },
-  { key: 'pipeline',  label: 'Pipeline'                      },
-  { key: 'omitted',   label: 'Not Forecasted'                },
+  { key: 'closedWon',  label: 'Closed Won',    readOnly: true },
+  { key: 'commit',     label: 'Commit'                        },
+  { key: 'mostLikely', label: 'Most Likely'                   },
+  { key: 'bestCase',   label: 'Best Case'                     },
+  { key: 'pipeline',   label: 'Pipeline'                      },
+  { key: 'omitted',    label: 'Not Forecasted'                },
 ];
 
 // ─── £k input ────────────────────────────────────────────────────────────────
@@ -158,8 +160,8 @@ export default function ForecastView({ deals, area, accentColor, serverForecast 
   const qCalc = calcPipeline(filterByDate(deals, qFrom, qTo));
 
   // SD totals always use calculated closedWon (not stored) + entered values
-  const sdMTotal = mCalc.closedWon + draft.month.commit   + draft.month.bestCase   + draft.month.pipeline   + draft.month.omitted;
-  const sdQTotal = qCalc.closedWon + draft.quarter.commit + draft.quarter.bestCase + draft.quarter.pipeline + draft.quarter.omitted;
+  const sdMTotal = mCalc.closedWon + draft.month.commit   + draft.month.mostLikely   + draft.month.bestCase   + draft.month.pipeline   + draft.month.omitted;
+  const sdQTotal = qCalc.closedWon + draft.quarter.commit + draft.quarter.mostLikely + draft.quarter.bestCase + draft.quarter.pipeline + draft.quarter.omitted;
 
   const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   const qLabel     = `Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${new Date().getFullYear()}`;

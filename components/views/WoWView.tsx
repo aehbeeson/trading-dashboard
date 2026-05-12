@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Deal } from '@/lib/types';
 
 const FC_ORDER: Record<string, number> = {
-  'Omitted': 0, 'Pipeline': 1, 'Best Case': 2, 'Commit': 3,
+  'Omitted': 0, 'Pipeline': 1, 'Best Case': 2, 'Most Likely': 3, 'Commit': 4,
 };
 
 function fmtK(v: number): string {
