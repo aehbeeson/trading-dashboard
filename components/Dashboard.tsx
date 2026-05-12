@@ -171,10 +171,10 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
           mobileNavOpen ? 'flex translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        <div className="px-5 pt-5 pb-5 border-b border-white/5">
+        <div className="px-5 pt-6 pb-5 border-b border-white/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/busuu-logo.png" alt="Busuu" className="h-6 w-auto" />
-          <p className="mt-3 text-[10px] font-semibold text-slate-400 tracking-[0.18em] uppercase">B2B Trading</p>
+          <img src="/busuu-logo.png" alt="Busuu" className="h-9 w-auto" />
+          <p className="mt-3 text-base font-extrabold text-white tracking-[0.08em] uppercase">B2B Trading</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 text-sm">
