@@ -3,23 +3,12 @@
 import { useMemo, useState } from 'react';
 import { GuildFunnelData, GuildFunnelMetrics, GuildFunnelPeriod } from '@/lib/types';
 
-type Granularity = 'month' | 'quarter' | 'year';
-
-interface PeriodOption {
-  type:       Granularity;
-  key:        string;
-  label:      string;
-  year:       number;
-  month?:     number;
-  quarter?:   number;
-  metrics:    GuildFunnelMetrics;
-  isForecast: boolean;
-}
+type ViewMode = 'table' | 'funnel';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 function fmtEUR(v: number): string {
-  if (v === 0) return '€0';
+  if (v === 0) return '—';
   const abs = Math.abs(v);
   if (abs >= 1_000_000) return '€' + (v / 1_000_000).toFixed(2) + 'M';
   if (abs >= 1_000)     return '€' + Math.round(v / 1000).toLocaleString() + 'k';
@@ -27,7 +16,13 @@ function fmtEUR(v: number): string {
 }
 
 function fmtPct(v: number): string {
+  if (v === 0) return '—';
   return Math.round(v * 100) + '%';
+}
+
+function fmtNum(v: number): string {
+  if (v === 0) return '—';
+  return v.toLocaleString();
 }
 
 // ─── Aggregation ─────────────────────────────────────────────────────────────
@@ -58,60 +53,6 @@ function aggregateMetrics(months: GuildFunnelPeriod[]): GuildFunnelMetrics {
   };
 }
 
-function buildOptions(periods: GuildFunnelPeriod[]): PeriodOption[] {
-  const opts: PeriodOption[] = [];
-
-  for (const p of periods) {
-    opts.push({
-      type: 'month',
-      key:  `month:${p.key}`,
-      label: p.label,
-      year:  p.year,
-      month: p.month,
-      metrics: p.metrics,
-      isForecast: p.isForecast,
-    });
-  }
-
-  const byQuarter = new Map<string, GuildFunnelPeriod[]>();
-  for (const p of periods) {
-    const q = Math.ceil(p.month / 3);
-    const k = `${p.year}-Q${q}`;
-    if (!byQuarter.has(k)) byQuarter.set(k, []);
-    byQuarter.get(k)!.push(p);
-  }
-  byQuarter.forEach((ms, k) => {
-    const [y, qStr] = k.split('-Q');
-    const year = +y, quarter = +qStr;
-    opts.push({
-      type: 'quarter',
-      key:  `quarter:${k}`,
-      label: `Q${quarter} ${year}`,
-      year, quarter,
-      metrics: aggregateMetrics(ms),
-      isForecast: ms.every(m => m.isForecast),
-    });
-  });
-
-  const byYear = new Map<number, GuildFunnelPeriod[]>();
-  for (const p of periods) {
-    if (!byYear.has(p.year)) byYear.set(p.year, []);
-    byYear.get(p.year)!.push(p);
-  }
-  byYear.forEach((ms, y) => {
-    opts.push({
-      type: 'year',
-      key:  `year:${y}`,
-      label: String(y),
-      year:  y,
-      metrics: aggregateMetrics(ms),
-      isForecast: ms.every(m => m.isForecast),
-    });
-  });
-
-  return opts;
-}
-
 // ─── Main view ───────────────────────────────────────────────────────────────
 
 interface GuildFunnelViewProps {
@@ -120,39 +61,270 @@ interface GuildFunnelViewProps {
 }
 
 export default function GuildFunnelView({ data, accentColor }: GuildFunnelViewProps) {
-  const allOptions = useMemo(() => buildOptions(data.periods), [data]);
-  const monthOpts   = useMemo(() => allOptions.filter(o => o.type === 'month').sort((a, b)   => b.key.localeCompare(a.key)), [allOptions]);
-  const quarterOpts = useMemo(() => allOptions.filter(o => o.type === 'quarter').sort((a, b) => b.key.localeCompare(a.key)), [allOptions]);
-  const yearOpts    = useMemo(() => allOptions.filter(o => o.type === 'year').sort((a, b)    => b.year - a.year), [allOptions]);
+  // Years available in the data
+  const years = useMemo(() => {
+    return Array.from(new Set(data.periods.map(p => p.year))).sort((a, b) => b - a);
+  }, [data]);
 
-  const defaultKey = useMemo(() => {
-    const today = new Date();
-    const thisMonthKey = `month:${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    return (
-      monthOpts.find(o => o.key === thisMonthKey)?.key
-      ?? monthOpts.find(o => o.isForecast)?.key
-      ?? monthOpts[0]?.key
-      ?? ''
-    );
-  }, [monthOpts]);
+  const today = new Date();
+  const defaultYear = years.includes(today.getFullYear()) ? today.getFullYear() : years[0];
 
-  const [selKey, setSelKey] = useState(defaultKey);
-  const selected = allOptions.find(o => o.key === selKey) ?? allOptions.find(o => o.key === defaultKey) ?? allOptions[0];
+  const [year, setYear]     = useState(defaultYear);
+  const [view, setView]     = useState<ViewMode>('table');
 
-  function setMode(newMode: Granularity) {
-    const list = newMode === 'month' ? monthOpts : newMode === 'quarter' ? quarterOpts : yearOpts;
-    const aligned = list.find(o => o.year === selected.year) ?? list[0];
-    if (aligned) setSelKey(aligned.key);
-  }
-
-  if (!selected) return null;
-  const m = selected.metrics;
-  const mode = selected.type;
-  const currentList = mode === 'month' ? monthOpts : mode === 'quarter' ? quarterOpts : yearOpts;
+  // Months for the selected year, indexed 1..12 (sparse — may be missing some)
+  const yearPeriods = useMemo(
+    () => data.periods.filter(p => p.year === year).sort((a, b) => a.month - b.month),
+    [data, year],
+  );
+  const isYearForecast = yearPeriods.length > 0 && yearPeriods.every(p => p.isForecast);
 
   return (
     <div className="space-y-5">
-      {/* ── Period selector ───────────────── */}
+      {/* ── Top controls: year + view ───────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-[0.14em]">Year</span>
+          <div className="flex items-center bg-gray-100/80 ring-1 ring-inset ring-gray-200/70 rounded-lg px-0.5 py-0.5">
+            {years.map(y => (
+              <button
+                key={y}
+                onClick={() => setYear(y)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all tabular-nums ${
+                  y === year
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-gray-200/70'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+          {isYearForecast && (
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-200/70 px-2 py-0.5 rounded-full">
+              Forecast
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-[0.14em]">View</span>
+          <div className="flex items-center bg-gray-100/80 ring-1 ring-inset ring-gray-200/70 rounded-lg px-0.5 py-0.5">
+            {(['table', 'funnel'] as ViewMode[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all capitalize ${
+                  v === view
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-gray-200/70'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {view === 'table'
+        ? <TableView yearPeriods={yearPeriods} year={year} accentColor={accentColor} />
+        : <FunnelView yearPeriods={yearPeriods} year={year} accentColor={accentColor} />}
+    </div>
+  );
+}
+
+// ─── Table view ──────────────────────────────────────────────────────────────
+
+interface ViewProps {
+  yearPeriods: GuildFunnelPeriod[];
+  year:        number;
+  accentColor: string;
+}
+
+function TableView({ yearPeriods, year }: ViewProps) {
+  // Build a sparse lookup: month (1..12) → metrics; missing months show as blanks
+  const byMonth = new Map<number, GuildFunnelMetrics>();
+  yearPeriods.forEach(p => byMonth.set(p.month, p.metrics));
+
+  function quarterMetrics(q: number): GuildFunnelMetrics | null {
+    const months = yearPeriods.filter(p => Math.ceil(p.month / 3) === q);
+    return months.length > 0 ? aggregateMetrics(months) : null;
+  }
+
+  function yearMetrics(): GuildFunnelMetrics | null {
+    return yearPeriods.length > 0 ? aggregateMetrics(yearPeriods) : null;
+  }
+
+  const monthLabels = Array.from({ length: 12 }, (_, i) =>
+    new Date(year, i, 1).toLocaleDateString('en-GB', { month: 'short' })
+  );
+
+  const rows: { label: string; group: string; format: (v: number) => string; pick: (m: GuildFunnelMetrics) => number; emphasis?: 'total' }[] = [
+    { group: 'Bookings',   label: 'New',        format: fmtEUR, pick: m => m.newBookings },
+    { group: 'Bookings',   label: 'Recurring',  format: fmtEUR, pick: m => m.recurringBookings },
+    { group: 'Bookings',   label: 'Total',      format: fmtEUR, pick: m => m.totalBookings, emphasis: 'total' },
+    { group: 'Conversion', label: 'New',        format: fmtPct, pick: m => m.newConversion },
+    { group: 'Conversion', label: 'Recurring',  format: fmtPct, pick: m => m.recurringConversion },
+    { group: 'Conversion', label: 'Total',      format: fmtPct, pick: m => m.totalConversion, emphasis: 'total' },
+    { group: "EV's",       label: 'New',        format: fmtNum, pick: m => m.newEVs },
+    { group: "EV's",       label: 'Recurring',  format: fmtNum, pick: m => m.recurringEVs },
+    { group: "EV's",       label: 'Total',      format: fmtNum, pick: m => m.totalEVs, emphasis: 'total' },
+    { group: 'Leads',      label: 'New',        format: fmtNum, pick: m => m.newLeads },
+    { group: 'Leads',      label: 'Recurring',  format: fmtNum, pick: m => m.recurringLeads },
+    { group: 'Leads',      label: 'Total',      format: fmtNum, pick: m => m.totalLeads, emphasis: 'total' },
+  ];
+
+  const q1 = quarterMetrics(1);
+  const q2 = quarterMetrics(2);
+  const q3 = quarterMetrics(3);
+  const q4 = quarterMetrics(4);
+  const yr = yearMetrics();
+
+  if (yearPeriods.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card p-10 text-center text-slate-400 text-sm">
+        No data available for {year}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs tabular-nums">
+          <colgroup>
+            <col style={{ width: '180px' }} />
+            {Array.from({ length: 12 }).map((_, i) => <col key={i} style={{ width: '70px' }} />)}
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '88px' }} />
+            <col style={{ width: '96px' }} />
+          </colgroup>
+          <thead>
+            <tr className="bg-gray-50/70 border-b border-gray-200 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+              <th className="sticky left-0 z-10 bg-gray-50/95 backdrop-blur px-4 py-2.5 text-left">Metric</th>
+              {monthLabels.map((lbl, i) => (
+                <th key={i} className="px-2 py-2.5 text-right">{lbl}</th>
+              ))}
+              <th className="px-2 py-2.5 text-right bg-slate-50">Q1</th>
+              <th className="px-2 py-2.5 text-right bg-slate-50">Q2</th>
+              <th className="px-2 py-2.5 text-right bg-slate-50">Q3</th>
+              <th className="px-2 py-2.5 text-right bg-slate-50">Q4</th>
+              <th className="px-2 py-2.5 text-right bg-slate-100 text-slate-700">{year}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const prev = i > 0 ? rows[i - 1] : null;
+              const startsGroup = !prev || prev.group !== row.group;
+              const isTotal = row.emphasis === 'total';
+              const rowCls = `${isTotal ? 'bg-slate-50/40 font-semibold text-slate-900' : 'hover:bg-slate-50/50 text-slate-700'} ${startsGroup ? 'border-t-2 border-gray-200' : 'border-t border-gray-50'}`;
+
+              return (
+                <tr key={`${row.group}-${row.label}`} className={rowCls}>
+                  <td className={`sticky left-0 z-10 ${isTotal ? 'bg-slate-50/95' : 'bg-white'} backdrop-blur px-4 py-2`}>
+                    <div className="flex items-center gap-2">
+                      {startsGroup && (
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em] w-[78px] flex-shrink-0">
+                          {row.group}
+                        </span>
+                      )}
+                      {!startsGroup && <span className="w-[78px] flex-shrink-0" />}
+                      <span className={`${isTotal ? 'font-semibold text-slate-900' : 'font-medium text-slate-600'}`}>
+                        {row.label}
+                      </span>
+                    </div>
+                  </td>
+                  {Array.from({ length: 12 }, (_, mi) => {
+                    const m = byMonth.get(mi + 1);
+                    return (
+                      <td key={mi} className="px-2 py-2 text-right">
+                        {m ? row.format(row.pick(m)) : <span className="text-gray-300">—</span>}
+                      </td>
+                    );
+                  })}
+                  {[q1, q2, q3, q4].map((q, qi) => (
+                    <td key={qi} className={`px-2 py-2 text-right ${isTotal ? 'bg-slate-100/60' : 'bg-slate-50/70'}`}>
+                      {q ? row.format(row.pick(q)) : <span className="text-gray-300">—</span>}
+                    </td>
+                  ))}
+                  <td className={`px-2 py-2 text-right font-semibold ${isTotal ? 'bg-slate-200/60 text-slate-900' : 'bg-slate-100/60 text-slate-800'}`}>
+                    {yr ? row.format(row.pick(yr)) : <span className="text-gray-300">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Funnel view ─────────────────────────────────────────────────────────────
+
+function FunnelView({ yearPeriods, year, accentColor }: ViewProps) {
+  // Period selector inside funnel view: month / quarter / year
+  type Granularity = 'month' | 'quarter' | 'year';
+
+  const monthOpts = yearPeriods.map(p => ({
+    key:    `month:${p.month}`,
+    label:  p.label,
+    metrics: p.metrics,
+    forecast: p.isForecast,
+  }));
+
+  const quarterOpts = [1, 2, 3, 4].map(q => {
+    const months = yearPeriods.filter(p => Math.ceil(p.month / 3) === q);
+    if (months.length === 0) return null;
+    return {
+      key:    `quarter:${q}`,
+      label:  `Q${q} ${year}`,
+      metrics: aggregateMetrics(months),
+      forecast: months.every(m => m.isForecast),
+    };
+  }).filter(Boolean) as { key: string; label: string; metrics: GuildFunnelMetrics; forecast: boolean }[];
+
+  const yearOpt = yearPeriods.length > 0
+    ? {
+        key:    `year:${year}`,
+        label:  String(year),
+        metrics: aggregateMetrics(yearPeriods),
+        forecast: yearPeriods.every(p => p.isForecast),
+      }
+    : null;
+
+  const today = new Date();
+  const defaultKey = today.getFullYear() === year && monthOpts.find(o => o.key === `month:${today.getMonth() + 1}`)
+    ? `month:${today.getMonth() + 1}`
+    : (yearOpt?.key ?? monthOpts[monthOpts.length - 1]?.key ?? '');
+
+  const [selKey, setSelKey] = useState(defaultKey);
+
+  const mode: Granularity = selKey.startsWith('month:') ? 'month' : selKey.startsWith('quarter:') ? 'quarter' : 'year';
+  const list = mode === 'month' ? monthOpts : mode === 'quarter' ? quarterOpts : (yearOpt ? [yearOpt] : []);
+  const selected = list.find(o => o.key === selKey) ?? list[0];
+
+  function setMode(g: Granularity) {
+    const next = g === 'month' ? monthOpts[monthOpts.length - 1] : g === 'quarter' ? quarterOpts[quarterOpts.length - 1] : yearOpt;
+    if (next) setSelKey(next.key);
+  }
+
+  if (!selected) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card p-10 text-center text-slate-400 text-sm">
+        No data available for {year}.
+      </div>
+    );
+  }
+
+  const m = selected.metrics;
+
+  return (
+    <div className="space-y-4">
+      {/* Period selector */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs">
           <span className="font-semibold text-slate-400 uppercase tracking-[0.12em]">Period</span>
@@ -171,11 +343,6 @@ export default function GuildFunnelView({ data, accentColor }: GuildFunnelViewPr
               </button>
             ))}
           </div>
-          {selected.isForecast && (
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 bg-amber-50 ring-1 ring-inset ring-amber-200/70 px-2 py-0.5 rounded-full">
-              Forecast
-            </span>
-          )}
         </div>
 
         <select
@@ -183,36 +350,19 @@ export default function GuildFunnelView({ data, accentColor }: GuildFunnelViewPr
           onChange={e => setSelKey(e.target.value)}
           className="appearance-none text-sm font-medium border border-gray-200 rounded-lg px-3 py-1.5 pr-8 text-slate-700 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300/60 cursor-pointer bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-no-repeat bg-[length:12px_12px] bg-[position:right_10px_center]"
         >
-          {currentList.map(o => (
+          {list.map(o => (
             <option key={o.key} value={o.key}>{o.label}</option>
           ))}
         </select>
       </div>
 
-      {/* ── Side-by-side funnels ──────────── */}
+      {/* Side-by-side funnels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FunnelColumn
-          title="New"
-          subtitle="New business"
-          leads={m.newLeads}
-          evs={m.newEVs}
-          conv={m.newConversion}
-          bookings={m.newBookings}
-          accent={accentColor}
-        />
-        <FunnelColumn
-          title="Recurring"
-          subtitle="Renewals + expansion"
-          leads={m.recurringLeads}
-          evs={m.recurringEVs}
-          conv={m.recurringConversion}
-          bookings={m.recurringBookings}
-          accent={accentColor}
-          secondary
-        />
+        <FunnelColumn title="New"       subtitle="New business"          leads={m.newLeads}       evs={m.newEVs}       conv={m.newConversion}       bookings={m.newBookings}       accent={accentColor} />
+        <FunnelColumn title="Recurring" subtitle="Renewals + expansion"  leads={m.recurringLeads} evs={m.recurringEVs} conv={m.recurringConversion} bookings={m.recurringBookings} accent={accentColor} secondary />
       </div>
 
-      {/* ── Total summary line ─────────────── */}
+      {/* Total summary line */}
       <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card px-5 py-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
@@ -231,14 +381,11 @@ export default function GuildFunnelView({ data, accentColor }: GuildFunnelViewPr
           </div>
         </div>
       </div>
-
-      {/* ── Monthly chart ─────────────────── */}
-      <MonthlyChart periods={data.periods} accentColor={accentColor} selected={selected} />
     </div>
   );
 }
 
-// ─── Funnel column ───────────────────────────────────────────────────────────
+// ─── Funnel column (used by FunnelView) ──────────────────────────────────────
 
 interface FunnelColumnProps {
   title:      string;
@@ -254,7 +401,7 @@ interface FunnelColumnProps {
 function FunnelColumn({ title, subtitle, leads, evs, conv, bookings, accent, secondary }: FunnelColumnProps) {
   const leadW = 100;
   const evW   = leads > 0 ? Math.max(15, Math.round((evs / leads) * 100)) : 100;
-  const bookW = leads > 0 ? Math.max(15, Math.round((evs / leads) * 100) * 0.8) : 80;
+  const bookW = leads > 0 ? Math.max(15, Math.round((evs / leads) * 80)) : 80;
   const stageOpacity = secondary ? 0.45 : 0.85;
 
   return (
@@ -303,100 +450,6 @@ function FunnelArrow({ conv }: { conv?: number }) {
           {fmtPct(conv)}
         </span>
       )}
-    </div>
-  );
-}
-
-// ─── Monthly chart ───────────────────────────────────────────────────────────
-
-interface MonthlyChartProps {
-  periods:     GuildFunnelPeriod[];
-  accentColor: string;
-  selected:    PeriodOption;
-}
-
-function MonthlyChart({ periods, accentColor, selected }: MonthlyChartProps) {
-  const sorted = useMemo(() => [...periods].sort((a, b) => a.key.localeCompare(b.key)), [periods]);
-  if (sorted.length === 0) return null;
-
-  const maxBookings = Math.max(...sorted.map(p => p.metrics.totalBookings), 1);
-
-  function isHighlighted(p: GuildFunnelPeriod): boolean {
-    if (selected.type === 'month')   return p.year === selected.year && p.month === selected.month;
-    if (selected.type === 'quarter') return p.year === selected.year && Math.ceil(p.month / 3) === selected.quarter;
-    if (selected.type === 'year')    return p.year === selected.year;
-    return false;
-  }
-
-  // Detect transitions to draw year separators
-  const transitions = new Set<number>();
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].year !== sorted[i - 1].year) transitions.add(i);
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-card p-5">
-      <div className="flex items-baseline justify-between mb-5">
-        <h3 className="text-sm font-semibold text-slate-800">Monthly Total Bookings</h3>
-        <div className="flex items-center gap-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: accentColor, opacity: 0.85 }} />
-            Actuals
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: accentColor, opacity: 0.4 }} />
-            Forecast
-          </span>
-        </div>
-      </div>
-
-      <div className="flex items-end gap-1 h-36 relative">
-        {sorted.map((p, i) => {
-          const h = Math.max(2, Math.round((p.metrics.totalBookings / maxBookings) * 100));
-          const highlighted = isHighlighted(p);
-          const showYearTransition = transitions.has(i);
-          return (
-            <div key={p.key} className="flex-1 flex flex-col items-center gap-1.5 min-w-0 group cursor-pointer relative">
-              {showYearTransition && (
-                <span className="absolute -left-1 inset-y-0 w-px bg-gray-200" aria-hidden="true" />
-              )}
-              <div className="w-full flex flex-col-reverse h-full">
-                <div
-                  className="w-full rounded-t-sm transition-all duration-200 group-hover:opacity-100"
-                  style={{
-                    height:          `${h}%`,
-                    backgroundColor: accentColor,
-                    opacity:         highlighted ? 1 : (p.isForecast ? 0.4 : 0.85),
-                    outline:         highlighted ? `2px solid ${accentColor}` : 'none',
-                    outlineOffset:   highlighted ? '2px' : '0',
-                  }}
-                  title={`${p.label}: ${fmtEUR(p.metrics.totalBookings)}`}
-                />
-              </div>
-              <span className="text-[9px] font-semibold text-slate-400 tabular-nums truncate w-full text-center uppercase">
-                {new Date(p.year, p.month - 1, 1).toLocaleDateString('en-GB', { month: 'short' }).slice(0, 1)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Year labels under the chart */}
-      <div className="mt-1 flex items-center text-[10px] font-semibold text-slate-400 uppercase tracking-[0.12em]">
-        {Array.from(new Set(sorted.map(p => p.year))).map(year => {
-          const count = sorted.filter(p => p.year === year).length;
-          const total = sorted.length;
-          return (
-            <span
-              key={year}
-              className="text-center border-t border-gray-200 pt-1.5"
-              style={{ flexBasis: `${(count / total) * 100}%` }}
-            >
-              {year}
-            </span>
-          );
-        })}
-      </div>
     </div>
   );
 }
