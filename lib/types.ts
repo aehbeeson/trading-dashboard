@@ -85,3 +85,38 @@ export const SUB_TABS: { key: SubTabKey; label: string }[] = [
   { key: 'wow',      label: 'WoW Changes'          },
   { key: 'prior',    label: 'Prior Period Results' },
 ];
+
+// Areas that use the Guild funnel view exclusively (Leads → EVs → Bookings).
+// These areas SKIP the deal-based sub-tabs and render the funnel directly.
+export const GUILD_FUNNEL_AREAS: AreaKey[] = ['guild-fll', 'guild-ell'];
+
+export interface GuildFunnelMetrics {
+  newBookings:         number;  // EUR
+  recurringBookings:   number;
+  totalBookings:       number;
+  newConversion:       number;  // 0..1
+  recurringConversion: number;
+  totalConversion:     number;
+  newEVs:              number;
+  recurringEVs:        number;
+  totalEVs:            number;
+  newLeads:            number;
+  recurringLeads:      number;
+  totalLeads:          number;
+  bookingsUSD:         number;
+}
+
+export interface GuildFunnelPeriod {
+  key:         string;                       // "2026-05"
+  label:       string;                       // "May 2026"
+  granularity: 'month';                      // mock stores monthly; quarter/year aggregated in view
+  year:        number;
+  month:       number;
+  isForecast:  boolean;
+  metrics:     GuildFunnelMetrics;
+}
+
+export interface GuildFunnelData {
+  area:    'guild-fll' | 'guild-ell';
+  periods: GuildFunnelPeriod[];
+}

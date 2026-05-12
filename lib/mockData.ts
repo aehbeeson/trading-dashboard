@@ -1,4 +1,4 @@
-import { Deal, MastersheetForecast } from './types';
+import { Deal, MastersheetForecast, GuildFunnelData, GuildFunnelPeriod } from './types';
 
 // Placeholder data — replace by wiring up Google Sheets in lib/sheets.ts
 export const thisWeekDeals: Deal[] = [
@@ -166,5 +166,101 @@ export const monthsMForecasts: MastersheetForecast[] = [
       '2026-07': 249823, '2026-08': 249345, '2026-09': 268728,
       '2026-10': 254183, '2026-11': 266424, '2026-12': 293300,
     },
+  },
+];
+
+// ─── Guild FLL & ELL funnel mock data ────────────────────────────────────────
+// Mirrors the new "Guild" tab of the Google Sheet: Leads → EVs → Bookings,
+// split into New / Recurring / Total. Replace by wiring the sheet through
+// fetchDashboardData in lib/sheets.ts.
+
+function gp(
+  year: number, month: number, forecast: boolean,
+  newL: number, recL: number,
+  newE: number, recE: number,
+  newB: number, recB: number,
+  newConv: number, recConv: number, totalConv: number,
+  bookUSD: number,
+): GuildFunnelPeriod {
+  const label = new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  return {
+    key: `${year}-${String(month).padStart(2, '0')}`,
+    label,
+    granularity: 'month',
+    year, month,
+    isForecast: forecast,
+    metrics: {
+      newBookings:         newB,
+      recurringBookings:   recB,
+      totalBookings:       newB + recB,
+      newConversion:       newConv / 100,
+      recurringConversion: recConv / 100,
+      totalConversion:     totalConv / 100,
+      newEVs:              newE,
+      recurringEVs:        recE,
+      totalEVs:            newE + recE,
+      newLeads:            newL,
+      recurringLeads:      recL,
+      totalLeads:          newL + recL,
+      bookingsUSD:         bookUSD,
+    },
+  };
+}
+
+export const guildFunnelData: GuildFunnelData[] = [
+  {
+    area: 'guild-fll',
+    periods: [
+      gp(2025,  1, false, 260, 146, 210, 146, 304145, 211453, 81, 100, 88, 533644),
+      gp(2025,  2, false, 342, 172, 272, 169, 391670, 243354, 80,  98, 86, 661059),
+      gp(2025,  3, false, 359,  97, 292,  94, 405661, 130589, 81,  97, 85, 578614),
+      gp(2025,  4, false, 332,  74, 270,  72, 360080,  96021, 81,  97, 84, 512658),
+      gp(2025,  5, false, 388, 155, 310, 150, 411959, 199335, 80,  97, 85, 689540),
+      gp(2025,  6, false, 379,  88, 307,  86, 399473, 111905, 81,  98, 84, 589107),
+      gp(2025,  7, false, 329,  66, 263,  63, 337243,  80784, 80,  95, 83, 488674),
+      gp(2025,  8, false, 289,  96, 237,  96, 304947, 123523, 82, 100, 86, 499167),
+      gp(2025,  9, false, 377,  72, 304,  70, 388488,  89454, 81,  97, 83, 560626),
+      gp(2025, 10, false, 347,  66, 281,  64, 361684,  82376, 81,  97, 84, 517155),
+      gp(2025, 11, false, 325, 104, 265, 102, 343546, 132233, 82,  98, 86, 550133),
+      gp(2025, 12, false, 254,  80, 196,  78, 250799,  99808, 77,  98, 82, 410726),
+      gp(2026,  1, true,  236,  74, 197,  74, 251750,  94566, 83, 100, 87, 406229),
+      gp(2026,  2, true,  379,  71, 321,  70, 406745,  88698, 85,  99, 87, 586109),
+      gp(2026,  3, true,  321,  74, 271,  57, 351361,  73903, 84,  77, 83, 491672),
+      gp(2026,  4, true,  313,  77, 261,  63, 334732,  80766, 83,  82, 83, 485717.97),
+      gp(2026,  5, true,  292,  76, 242,   0, 313188,      0, 83,   0, 66, 363297.64),
+      gp(2026,  6, true,  361, 122, 300,  98, 387194, 126123, 83,  80, 82, 595447.77),
+      gp(2026,  7, true,  385, 126, 312, 101, 402985, 130258, 81,  80, 81, 618562.35),
+      gp(2026,  8, true,  385, 126, 312, 101, 402985, 130258, 81,  80, 81, 618562.35),
+      gp(2026,  9, true,  385, 126, 312, 101, 402985, 130258, 81,  80, 81, 618562.35),
+      gp(2026, 10, true,  407, 129, 330, 103, 426013, 133359, 81,  80, 81, 648872.13),
+      gp(2026, 11, true,  407, 129, 330, 103, 426013, 133359, 81,  80, 81, 648872.13),
+      gp(2026, 12, true,  407, 129, 330, 103, 426013, 133359, 81,  80, 81, 648872.13),
+    ],
+  },
+  {
+    area: 'guild-ell',
+    periods: [
+      gp(2025,  4, false,  91,  0,  71,  0,  94688,     0, 78,   0, 78, 106429),
+      gp(2025,  5, false,  57,  0,  46,  0,  61129,     0, 81,   0, 81,  68954),
+      gp(2025,  6, false,  21,  0,  19,  0,  24866,     0, 91,   0, 91,  28645.89),
+      gp(2025,  7, false,  43,  0,  41,  0,  52547,     0, 95,   0, 95,  61427.52),
+      gp(2025,  8, false,  33,  0,  28,  0,  36027,     0, 85,   0, 85,  41972),
+      gp(2025,  9, false,  19,  0,  16,  0,  20447,     0, 84,   0, 84,  23984),
+      gp(2025, 10, false,  45, 12,  34, 12,  43730, 15446, 76, 100, 81,  68916.53),
+      gp(2025, 11, false,  33,  8,  30,  8,  38892, 10371, 91, 100, 93,  56962),
+      gp(2025, 12, false,  15,  2,  11,  2,  14395,  1919, 75,  75, 75,  19112.25),
+      gp(2026,  1, true,   27,  2,  20,  2,  25558,  2556, 74, 100, 77,  32978),
+      gp(2026,  2, true,   61,  5,  48,  5,  60822,  6336, 79, 100, 80,  79447),
+      gp(2026,  3, true,   48,  1,  45,  1,  58344,  1297, 94, 100, 94,  68954),
+      gp(2026,  4, true,   42,  2,  36,  2,  46155,  2565, 86, 100, 86,  56953.01),
+      gp(2026,  5, true,   18,  2,  14,  2,  18608,  2584, 80, 100, 82,  24583.60),
+      gp(2026,  6, true,  150,  3, 125,  3, 160884,  3877, 83, 100, 83, 191122.50),
+      gp(2026,  7, true,  110,  3,  88,  3, 113717,  3877, 80, 100, 81, 136409),
+      gp(2026,  8, true,  110,  7,  88,  7, 113717,  9046, 80, 100, 81, 142405),
+      gp(2026,  9, true,  150,  7, 120,  7, 155069,  9046, 80, 100, 81, 190373),
+      gp(2026, 10, true,  160,  7, 128,  7, 165407,  9046, 80, 100, 81, 202365),
+      gp(2026, 11, true,  160,  7, 128,  7, 165407,  9046, 80, 100, 81, 202365),
+      gp(2026, 12, true,  160,  7, 128,  7, 165407,  9046, 80, 100, 81, 202365),
+    ],
   },
 ];

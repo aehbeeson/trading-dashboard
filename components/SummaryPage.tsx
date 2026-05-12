@@ -107,7 +107,7 @@ function DataRow({ row, period, comment, onAreaClick }: {
         ? 'bg-slate-50/80 font-semibold'
         : 'hover:bg-slate-50/50'
     }`}>
-      <td className="px-5 py-3">
+      <td className="px-4 py-2">
         <div
           onClick={() => row.areaKey && onAreaClick(row.areaKey)}
           className={`flex items-center gap-2.5 ${row.areaKey ? 'cursor-pointer' : ''}`}
@@ -131,7 +131,7 @@ function DataRow({ row, period, comment, onAreaClick }: {
         </div>
 
         {!isTotal && (editing ? (
-          <div className="flex items-start gap-2 mt-2 ml-[18px]">
+          <div className="flex items-start gap-2 mt-1.5 ml-[18px]">
             <textarea
               autoFocus
               value={draft}
@@ -157,7 +157,7 @@ function DataRow({ row, period, comment, onAreaClick }: {
             </div>
           </div>
         ) : (
-          <p onClick={() => setEditing(true)} className="ml-[18px] mt-1 cursor-text">
+          <p onClick={() => setEditing(true)} className="ml-[18px] mt-0.5 cursor-text">
             {saved
               ? <span className="text-xs text-slate-500 hover:text-slate-700 leading-snug transition-colors">{saved}</span>
               : <span className="text-[11px] text-gray-300 italic hover:text-gray-400 transition-colors">Add note…</span>}
@@ -165,15 +165,15 @@ function DataRow({ row, period, comment, onAreaClick }: {
         ))}
       </td>
 
-      <td className="px-5 py-3 text-right align-top pt-3.5">
+      <td className="px-4 py-2 text-right align-top pt-2.5">
         {row.sdForecast !== null
           ? <span className="text-sm font-semibold text-slate-800 tabular-nums">{fmtK(row.sdForecast)}</span>
           : <span className="text-gray-300 text-xs">—</span>}
       </td>
-      <td className="px-5 py-3 text-right align-top pt-3.5">
+      <td className="px-4 py-2 text-right align-top pt-2.5">
         <DeltaCell delta={row.yoy} base={row.yoyBase} />
       </td>
-      <td className="px-5 py-3 text-right align-top pt-3.5">
+      <td className="px-4 py-2 text-right align-top pt-2.5">
         {row.vsM !== null
           ? <DeltaCell delta={row.vsM} base={row.vsMBase} />
           : <span className="text-gray-300 text-xs italic">—</span>}
@@ -205,10 +205,10 @@ function ResultsTable({ rows, onAreaClick, period, comments }: ResultsTableProps
           </colgroup>
           <thead>
             <tr className="bg-gray-50/70 border-b border-gray-200">
-              <th className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">Area</th>
-              <th className="px-5 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">SD Forecast</th>
-              <th className="px-5 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">YoY</th>
-              <th className="px-5 py-3 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">vs M</th>
+              <th className="px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">Area</th>
+              <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">SD Forecast</th>
+              <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">YoY</th>
+              <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">vs M</th>
             </tr>
           </thead>
           <tbody>
@@ -362,33 +362,33 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
   const selectCls = "appearance-none text-sm font-medium border border-gray-200 rounded-lg px-3 py-1.5 pr-8 text-slate-700 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300/60 cursor-pointer bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-no-repeat bg-[length:12px_12px] bg-[position:right_10px_center]";
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-5">
 
       {/* ── Page heading with inline Closed Won stat ─ */}
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Overview</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Overview</h1>
+          <p className="mt-0.5 text-xs text-slate-500">
             {isCurrentMonth
               ? <>Live snapshot for <span className="font-medium text-slate-700">{mthLabel}</span> across all areas.</>
               : <>Historical snapshot for <span className="font-medium text-slate-700">{mthLabel}</span>.</>}
           </p>
         </div>
-        <div className="flex items-stretch gap-6 bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl shadow-card px-5 py-3">
+        <div className="flex items-stretch gap-5 bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-card px-4 py-2">
           <div className="text-right">
-            <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
               Closed Won · {mthLabel}
             </p>
-            <p className="mt-1 text-[28px] leading-none font-bold tabular-nums tracking-tight text-slate-900">
+            <p className="mt-0.5 text-[22px] leading-none font-bold tabular-nums tracking-tight text-slate-900">
               {fmtK(mthTotal.cw)}
             </p>
           </div>
           <div className="w-px bg-gray-200/80" aria-hidden="true" />
           <div className="text-right">
-            <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
               Closed Won · {qtrLabel}
             </p>
-            <p className="mt-1 text-[28px] leading-none font-bold tabular-nums tracking-tight text-slate-900">
+            <p className="mt-0.5 text-[22px] leading-none font-bold tabular-nums tracking-tight text-slate-900">
               {fmtK(qtrTotal.cw)}
             </p>
           </div>
@@ -396,7 +396,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       </div>
 
       {/* ── Month section ───────────────────────── */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-base font-semibold text-slate-900">{mthLabel}</h2>
@@ -417,7 +417,7 @@ export default function SummaryPage({ allThisWeek, allLastWeek, sdForecasts: _sd
       </div>
 
       {/* ── Quarter section ─────────────────────── */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-base font-semibold text-slate-900">{qtrLabel}</h2>

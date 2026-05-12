@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry, OverviewComment, MastersheetForecast } from '@/lib/types';
+import { Deal, AreaKey, SubTabKey, AREAS, SUB_TABS, GUILD_FUNNEL_AREAS, SDForecastEntry, PipelineGenDeal, PipelineGenForecastEntry, OverviewComment, MastersheetForecast, GuildFunnelData } from '@/lib/types';
 import SummaryPage from './SummaryPage';
 import AreaPage from './AreaPage';
 
@@ -15,6 +15,7 @@ interface DashboardProps {
   overviewComments:     OverviewComment[];
   mastersheetForecasts: MastersheetForecast[];
   monthsMForecasts:     MastersheetForecast[];
+  guildFunnel:          GuildFunnelData[];
   dataDownloadedAt:     string;
   fetchedAt:            string;
 }
@@ -86,7 +87,7 @@ const ICON_MENU       = 'M4 6h16 M4 12h16 M4 18h16';
 const ICON_CALENDAR   = 'M8 2v4 M16 2v4 M3 9h18 M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z';
 const ICON_CHEVRON    = 'M6 9l6 6 6-6';
 
-export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, monthsMForecasts, dataDownloadedAt, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, monthsMForecasts, guildFunnel, dataDownloadedAt, fetchedAt }: DashboardProps) {
   const [activeArea,    setActiveArea]    = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab,  setActiveSubTab]  = useState<SubTabKey>('results');
   const [filterFrom,    setFilterFrom]    = useState(defaultFrom);
@@ -196,13 +197,16 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
 
           <div className="space-y-0.5">
             {AREAS.map(area => {
-              const isActive = activeArea === area.key;
-              const tabs: { key: SubTabKey; label: string }[] = [
-                ...SUB_TABS,
-                ...(area.key === 'new-business'
-                  ? [{ key: 'pipeline-gen' as SubTabKey, label: 'Pipeline Generation' }]
-                  : []),
-              ];
+              const isActive    = activeArea === area.key;
+              const usesFunnel  = GUILD_FUNNEL_AREAS.includes(area.key);
+              const tabs: { key: SubTabKey; label: string }[] = usesFunnel
+                ? []
+                : [
+                    ...SUB_TABS,
+                    ...(area.key === 'new-business'
+                      ? [{ key: 'pipeline-gen' as SubTabKey, label: 'Pipeline Generation' }]
+                      : []),
+                  ];
               return (
                 <div key={area.key}>
                   <button
@@ -222,7 +226,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
                     <Icon d={AREA_ICON[area.key]} className="opacity-90" />
                     <span className="truncate">{area.label}</span>
                   </button>
-                  {isActive && (
+                  {isActive && tabs.length > 0 && (
                     <div className="mt-1 mb-1.5 ml-[26px] pl-3 border-l border-white/5 animate-fade-in">
                       {tabs.map(t => {
                         const subActive = activeSubTab === t.key;
@@ -292,18 +296,24 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
                       style={{ backgroundColor: activeAreaConfig.accentColor }}
                     />
                   )}
-                  <span className="text-slate-500 truncate">{activeAreaConfig?.label}</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-slate-900 font-semibold truncate">
-                    {subTabsForActive.find(t => t.key === activeSubTab)?.label}
-                  </span>
+                  {GUILD_FUNNEL_AREAS.includes(activeArea as AreaKey) ? (
+                    <span className="text-slate-900 font-semibold truncate">{activeAreaConfig?.label}</span>
+                  ) : (
+                    <>
+                      <span className="text-slate-500 truncate">{activeAreaConfig?.label}</span>
+                      <span className="text-slate-300">/</span>
+                      <span className="text-slate-900 font-semibold truncate">
+                        {subTabsForActive.find(t => t.key === activeSubTab)?.label}
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </h1>
 
             <div className="flex-1" />
 
-            {activeArea !== 'summary' && (
+            {activeArea !== 'summary' && !GUILD_FUNNEL_AREAS.includes(activeArea as AreaKey) && (
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {openDropdown && (
                   <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
@@ -401,6 +411,7 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
                 pipelineGen={pipelineGen}
                 pipelineGenLastWeek={pipelineGenLastWeek}
                 pipelineGenForecasts={pipelineGenForecasts}
+                guildFunnel={guildFunnel.find(g => g.area === activeArea) ?? null}
               />
             )}
           </div>
