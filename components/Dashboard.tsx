@@ -18,6 +18,7 @@ interface DashboardProps {
   guildFunnel:          GuildFunnelData[];
   dataDownloadedAt:     string;
   fetchedAt:            string;
+  userEmail:            string | null;
 }
 
 // Build YYYY-MM-DD from local date components to avoid UTC timezone shifts
@@ -87,7 +88,7 @@ const ICON_MENU       = 'M4 6h16 M4 12h16 M4 18h16';
 const ICON_CALENDAR   = 'M8 2v4 M16 2v4 M3 9h18 M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z';
 const ICON_CHEVRON    = 'M6 9l6 6 6-6';
 
-export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, monthsMForecasts, guildFunnel, dataDownloadedAt, fetchedAt }: DashboardProps) {
+export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen, pipelineGenLastWeek, pipelineGenForecasts, overviewComments, mastersheetForecasts, monthsMForecasts, guildFunnel, dataDownloadedAt, fetchedAt, userEmail }: DashboardProps) {
   const [activeArea,    setActiveArea]    = useState<AreaKey | 'summary'>('summary');
   const [activeSubTab,  setActiveSubTab]  = useState<SubTabKey>('results');
   const [filterFrom,    setFilterFrom]    = useState(defaultFrom);
@@ -263,6 +264,19 @@ export default function Dashboard({ thisWeek, lastWeek, sdForecasts, pipelineGen
             <p className="text-slate-300">{fetchTime}</p>
           </div>
         </div>
+
+        {userEmail && (
+          <div className="border-t border-white/5 px-4 py-3 text-[11px]">
+            <p className="text-slate-500 font-medium tracking-wide">Signed in</p>
+            <p className="text-slate-300 truncate" title={userEmail}>{userEmail}</p>
+            <a
+              href="/api/auth/signout"
+              className="mt-1.5 inline-block text-slate-400 hover:text-white transition-colors underline decoration-slate-700 underline-offset-2"
+            >
+              Sign out
+            </a>
+          </div>
+        )}
       </aside>
 
       {/* Mobile backdrop */}
